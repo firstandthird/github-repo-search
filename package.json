@@ -1,0 +1,35 @@
+{
+  "name": "omni-github",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Quickly access your Github repos from your browser omnibox",
+  "main": "extension/background/background.js",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:firstandthird/omni-github.git"
+  },
+  "keywords": [
+    "github",
+    "repos",
+    "omnibox"
+  ],
+  "author": "First+Third <code@firstandthird.com> (http://firstandthird.com/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/firstandthird/omni-github/issues"
+  },
+  "homepage": "https://github.com/firstandthird/omni-github",
+  "devDependencies": {
+    "eslint-config-firstandthird": "4.3.0",
+    "eslint-plugin-import": "2.8.0"
+  },
+  "eslintConfig": {
+    "extends": "firstandthird",
+    "env": {
+      "browser": true
+    },
+    "globals": {
+      "chrome": true
+    }
+  }
+}
