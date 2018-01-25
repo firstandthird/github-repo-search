@@ -182,22 +182,20 @@ async function search() {
  * @param {number} periodInMinutes
  */
 function createAlarm(name, periodInMinutes) {
-  browser.alarms.clear(name, browser.alarms.create(name, { periodInMinutes: parseInt(periodInMinutes) }));
+  browser.alarms.clear(name, () => browser.alarms.create(name, { periodInMinutes: parseInt(periodInMinutes) }));
 }
 
 /**
  * Adds context menu buttons
  */
 function addContextButtons() {
-  try {
-    browser.contextMenus.create({
-      id: OPTIONS.REFRESH_OPTION_ID,
-      contexts: ['browser_action'],
-      type: 'normal',
-      title: 'Synchronize repositories',
-      visible: true,
-    });
-  } catch(e) { }
+  browser.contextMenus.create({
+    id: OPTIONS.REFRESH_OPTION_ID,
+    contexts: ['browser_action'],
+    type: 'normal',
+    title: 'Synchronize repositories',
+    visible: true,
+  }, (e) => { });
 }
 
 /**
@@ -226,12 +224,12 @@ function onBrowserStorageChanged(changes, areaName) {
  * @param {text} text User entered text
  * @param {function} suggest Opens the suggestions box
  */
-async function onInputChangedHandler(text, suggest) {
-  if (suggestionsCache.length) {
+function onInputChangedHandler(text, suggest) {
+  if (suggestionsCache && suggestionsCache.length) {
     suggest(highlightResults(text, suggestionsCache));
   } else {
     syncLocalRepos(data => {
-      suggestionsCache = data.repos;
+      suggestionsCache = data;
       suggest(highlightResults(text, suggestionsCache));
     });
   }
