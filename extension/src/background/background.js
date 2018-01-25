@@ -231,7 +231,6 @@ async function onInputChangedHandler(text, suggest) {
     suggest(highlightResults(text, suggestionsCache));
   } else {
     syncLocalRepos(data => {
-      console.log(data);
       suggestionsCache = data.repos;
       suggest(highlightResults(text, suggestionsCache));
     });
@@ -261,7 +260,6 @@ async function syncLocalRepos(callback = () => { }) {
   browser.storage.local.get({
     'repos': []
   }, data => {
-    console.log(data);
     suggestionsCache = data.repos;
     callback(data.repos);
   });
@@ -276,7 +274,7 @@ async function syncLocalRepos(callback = () => { }) {
 async function syncRepos(notify = false, callback = () => { }) {
   try {
     suggestionsCache = await search();
-    console.log(suggestionsCache);
+
     browser.storage.local.set({ repos: suggestionsCache }, () => {
       if (notify) {
         createNotification('Synchronization finished!', 'Your GitHub repositories has been synchronized', 5000);
