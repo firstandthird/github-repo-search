@@ -1,15 +1,22 @@
-/* global chrome */
+const browser = window.browser || window.chrome;
 
-const TOKEN_NAME = 'gh_personal_token';
+const OPTIONS = {
+  TOKEN_NAME: 'ogh_personal_token',
+  REFRESH_TIME: 20
+};
 
 /**
- * Saves options to chrome.storage
+ * Saves options to browser.storage
  */
-function saveOptions() {
-  const token = document.getElementById('token').value;
+function saveOptions(e) {
+  e.preventDefault();
 
-  chrome.storage.sync.set({
-    [TOKEN_NAME]: token
+  const token = document.getElementById('token').value;
+  const refresh = document.getElementById('refresh').value;
+
+  browser.storage.sync.set({
+    [OPTIONS.TOKEN_NAME]: token,
+    [OPTIONS.REFRESH_TIME]: refresh
   }, () => {
     const status = document.getElementById('status');
 
@@ -25,12 +32,14 @@ function saveOptions() {
  * Restores previously saved token
  */
 function restoreOptions() {
-  chrome.storage.sync.get({
-    [TOKEN_NAME]: ''
+  browser.storage.sync.get({
+    [OPTIONS.TOKEN_NAME]: '',
+    [OPTIONS.REFRESH_TIME]: OPTIONS.REFRESH_TIME
   }, item => {
-    document.getElementById('token').value = item[TOKEN_NAME];
+    document.getElementById('token').value = item[OPTIONS.TOKEN_NAME];
+    document.getElementById('refresh').value = item[OPTIONS.REFRESH_TIME];
   });
 }
 
 document.addEventListener('DOMContentLoaded', restoreOptions);
-document.getElementById('save').addEventListener('click', saveOptions);
+document.getElementById('options-form').addEventListener('submit', saveOptions);

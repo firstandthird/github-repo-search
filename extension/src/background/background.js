@@ -1,9 +1,22 @@
+const browser = window.browser || window.chrome;
+
 /**
  * Default config
  */
-const TOKEN_NAME = 'gh_personal_token';
+const OPTIONS = {
+  TOKEN_NAME: 'ogh_personal_token',
+  REFRESH_TIME: 20,
+  REFRESH_OPTION_ID: 'ogh-refresh'
+};
+
+const ALARMS = {
+  REFRESH: 'ogh:refresh'
+};
+
 const MAX_SUGGESTIONS = 10;
+
 const RESULTS_PER_PAGE = 100;
+
 const FETCH_PARAMS = {
   method: 'GET',
   mode: 'cors',
@@ -31,11 +44,10 @@ let suggestionsCache = [];
  */
 function setToken(token = '') {
   apiUrl.searchParams.set('access_token', token);
-  return apiUrl;
 }
 
 /**
- * Filters a GitHub API response to match Chrome suggestions object
+ * Filters a GitHub API response to match browser suggestions object
  *
  * @param {array} data
  * @returns
@@ -74,6 +86,53 @@ function highlightResults(text, results) {
 }
 
 /**
+ * Enables manual sync button
+ */
+function enableSyncButton() {
+  setSyncButtonEnabled(true);
+}
+
+/**
+ * Disables manual sync button
+ */
+function disableSyncButton() {
+  setSyncButtonEnabled(false)
+}
+
+/**
+ * Sets manual sync button available state (enabled/disabled)
+ *
+ * @param {boolean} enabled
+ */
+function setSyncButtonEnabled(enabled = true) {
+  browser.contextMenus.update(OPTIONS.REFRESH_OPTION_ID, { enabled });
+}
+
+/**
+ * Creates a notification with the specified params
+ *
+ * @param {string} [contextMessage='']
+ * @param {string} [message='']
+ * @param {boolean} [requireInteraction=false] If activated notification won't automatically close
+ */
+function createNotification(contextMessage = '', message = '', timeout = 5000, requireInteraction = false) {
+  browser.notifications.create('ogh-notification', {
+    iconUrl: '../../icons/icon48.png',
+    type: 'basic',
+    title: 'Omni GitHub',
+    contextMessage,
+    message,
+    requireInteraction
+  });
+
+  if (timeout) {
+    setTimeout(() => {
+      browser.notifications.clear('ogh-notification');
+    }, timeout);
+  }
+}
+
+/**
  * Fetches GitHub user repos
  *
  * @returns {Promise}
@@ -90,11 +149,15 @@ async function search() {
       apiUrl.searchParams.set('page', page);
 
       const response = await fetch(apiUrl, FETCH_PARAMS);
-      const data = await response.json() || [];
+      const data = await response.json();
+
+      if (response.status >= 400) {
+        throw response;
+      }
 
       items = items.concat(data.map(formatAsSuggestion));
 
-      if (response.status === 403 || !data.length || data.length < RESULTS_PER_PAGE) {
+      if (!data.length || data.length < RESULTS_PER_PAGE) {
         isFetching = false;
         return items;
       }
@@ -103,6 +166,8 @@ async function search() {
     }
     catch (e) {
       isFetching = false;
+      disableSyncButton();
+      createNotification('Error syncing', 'Please provide a valid personal token in the options page', 5000);
       throw e;
     }
   };
@@ -110,45 +175,157 @@ async function search() {
   return getRepos();
 }
 
+/**
+ * Creates a browser alarm, which will be fired every specified period of time
+ *
+ * @param {string} name Alarm name
+ * @param {number} periodInMinutes
+ */
+function createAlarm(name, periodInMinutes) {
+  browser.alarms.clear(name, browser.alarms.create(name, { periodInMinutes: parseInt(periodInMinutes) }));
+}
+
+/**
+ * Adds context menu buttons
+ */
+function addContextButtons() {
+  try {
+    browser.contextMenus.create({
+      id: OPTIONS.REFRESH_OPTION_ID,
+      contexts: ['browser_action'],
+      type: 'normal',
+      title: 'Synchronize repositories',
+      visible: true,
+    });
+  } catch(e) { }
+}
+
+/**
+ * Handles browser storage changes
+ *
+ * @param {Object} changes
+ * @param {string} areaName
+ */
+function onBrowserStorageChanged(changes, areaName) {
+  if (areaName === 'sync') {
+    if (changes[OPTIONS.TOKEN_NAME]) {
+      setToken(changes[OPTIONS.TOKEN_NAME].newValue || changes[OPTIONS.TOKEN_NAME]);
+      syncRepos(true);
+      enableSyncButton();
+    }
+
+    if (changes[OPTIONS.REFRESH_TIME]) {
+      createAlarm(ALARMS.REFRESH, changes[OPTIONS.REFRESH_TIME].newValue || changes[OPTIONS.REFRESH_TIME]);
+    }
+  }
+}
 
 /**
  * Fired on every input change
+ *
+ * @param {text} text User entered text
+ * @param {function} suggest Opens the suggestions box
  */
-chrome.omnibox.onInputChanged.addListener(
-  (text, suggest) => {
-    chrome.storage.sync.get({
-      [TOKEN_NAME]: ''
-    }, async item => {
-      if (suggestionsCache.length || !item[TOKEN_NAME]) {
-        suggest(highlightResults(text, suggestionsCache));
-      } else {
-        setToken(item[TOKEN_NAME]);
-        suggestionsCache = await search();
-        suggest(highlightResults(text, suggestionsCache));
-      }
+async function onInputChangedHandler(text, suggest) {
+  if (suggestionsCache.length) {
+    suggest(highlightResults(text, suggestionsCache));
+  } else {
+    syncLocalRepos(data => {
+      console.log(data);
+      suggestionsCache = data.repos;
+      suggest(highlightResults(text, suggestionsCache));
     });
   }
-);
+}
 
 /**
  * Navigates to the given URL
  *
  * @param {string} url
  */
-function navigate(url) {
+function navigate(url, disposition) {
   try {
     new URL(url);
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.update(tabs[0].id, { url: url });
+    browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      browser.tabs.update(tabs[0].id, { url: url });
     });
   } catch (e) { }
 }
 
-/*
- * Redirects user to the selected suggestion URL
+/**
+ * Synchronizes local stored repositories
+ *
+ * @param {function} callback
  */
-chrome.omnibox.onInputEntered.addListener(
-  (url, disposition) => {
-    navigate(url);
+async function syncLocalRepos(callback = () => { }) {
+  browser.storage.local.get({
+    'repos': []
+  }, data => {
+    console.log(data);
+    suggestionsCache = data.repos;
+    callback(data.repos);
+  });
+}
+
+/**
+ * Fetches repos from GitHub and savem them into local storage
+ *
+ * @param {boolean} notify If active, shows a success notification
+ * @param {function} callback
+ */
+async function syncRepos(notify = false, callback = () => { }) {
+  try {
+    suggestionsCache = await search();
+    console.log(suggestionsCache);
+    browser.storage.local.set({ repos: suggestionsCache }, () => {
+      if (notify) {
+        createNotification('Synchronization finished!', 'Your GitHub repositories has been synchronized', 5000);
+      }
+
+      callback(suggestionsCache);
+    });
+  } catch (e) {
+
   }
-);
+}
+
+/**
+ * Register event listeners
+ */
+function registerListeners() {
+  browser.storage.onChanged.addListener(onBrowserStorageChanged);
+  browser.omnibox.onInputChanged.addListener(onInputChangedHandler);
+  browser.omnibox.onInputEntered.addListener(navigate);
+  browser.omnibox.onInputStarted.addListener(syncLocalRepos);
+  browser.contextMenus.onClicked.addListener(() => syncRepos(true));
+  browser.alarms.onAlarm.addListener(syncRepos);
+}
+
+/**
+ * Called on plugin load
+ */
+function init() {
+  addContextButtons();
+  registerListeners();
+
+  browser.storage.sync.get({
+    [OPTIONS.TOKEN_NAME]: '',
+    [OPTIONS.REFRESH_TIME]: OPTIONS.REFRESH_TIME
+  }, userConfig => {
+    try {
+      if (userConfig[OPTIONS.TOKEN_NAME]) {
+        setToken(userConfig[OPTIONS.TOKEN_NAME]);
+        syncLocalRepos(data => {
+          syncRepos();
+          createAlarm(ALARMS.REFRESH, userConfig[OPTIONS.REFRESH_TIME]);
+        });
+      } else {
+        disableSyncButton();
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  });
+}
+
+init();
