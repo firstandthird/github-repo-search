@@ -120,7 +120,7 @@ function createNotification(contextMessage = '', message = '', requireInteractio
   browser.notifications.create({
     iconUrl: '../../icons/icon48.png',
     type: 'basic',
-    title: 'Omni GitHub',
+    title: 'Github Repo Search',
     contextMessage,
     message,
     requireInteraction
