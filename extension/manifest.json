@@ -1,5 +1,5 @@
 {
-  "name": "Omni GitHub",
+  "name": "Github Repo Search",
   "description": "Quickly access your Github repos from your browser omnibox",
   "manifest_version": 2,
   "version": "1.0.0",
@@ -9,7 +9,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "homepage_url": "https://github.com/firstandthird/omni-github",
+  "homepage_url": "https://github.com/firstandthird/github-repo-search",
   "author": "First+Third <code@firstandthird.com> (http://firstandthird.com/)",
   "offline_enabled": false,
   "permissions": [

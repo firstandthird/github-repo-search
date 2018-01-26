@@ -1,4 +1,4 @@
-# Omni Papertrail Chrome Extension
+# Github Repos Chrome Extension
 
 Quickly access your Github repos from your browser omnibox.
 
