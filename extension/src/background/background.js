@@ -151,7 +151,7 @@ async function search() {
       }
 
       if (!showArchivedRepos) {
-        data = data.filter(repo => repo.archived);
+        data = data.filter(repo => !repo.archived);
       }
 
       items = items.concat(data.map(formatAsSuggestion));
@@ -201,7 +201,7 @@ function onBrowserStorageChanged(changes, areaName) {
     }
 
     if (changes[CONSTANTS.ARCHIVED_REPOS]) {
-      showArchivedRepos = changes[CONSTANTS.ARCHIVED_REPOS].newValue || changes[CONSTANTS.ARCHIVED_REPOS];
+      showArchivedRepos = changes[CONSTANTS.ARCHIVED_REPOS].newValue;
     }
 
     syncRepos(true);

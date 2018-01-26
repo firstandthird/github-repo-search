@@ -37,7 +37,7 @@ function restoreOptions() {
     [CONSTANTS.ARCHIVED_REPOS]: false
   }, item => {
     document.getElementById('token').value = item[CONSTANTS.TOKEN_NAME];
-    document.getElementById('archived').value = item[CONSTANTS.ARCHIVED_REPOS];
+    document.getElementById('archived').checked = item[CONSTANTS.ARCHIVED_REPOS];
   });
 }
 
