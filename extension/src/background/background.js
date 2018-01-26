@@ -3,14 +3,10 @@ const browser = window.browser || window.chrome;
 /**
  * Default config
  */
-const OPTIONS = {
+const CONSTANTS = {
   TOKEN_NAME: 'ogh_personal_token',
-  REFRESH_TIME: 20,
-  REFRESH_OPTION_ID: 'ogh-refresh'
-};
-
-const ALARMS = {
-  REFRESH: 'ogh:refresh'
+  REFRESH_OPTION_ID: 'ogh-refresh',
+  ARCHIVED_REPOS: 'archived'
 };
 
 const MAX_SUGGESTIONS = 10;
@@ -25,6 +21,11 @@ const FETCH_PARAMS = {
 
 const apiUrl = new URL('https://api.github.com/user/repos');
 apiUrl.searchParams.set('per_page', RESULTS_PER_PAGE);
+
+/**
+ * Default options
+ */
+let showArchivedRepos = false;
 
 /**
  * Indicates whether a request is still on course or not
@@ -56,7 +57,7 @@ function formatAsSuggestion(data) {
   return {
     content: data.html_url,
     description: `${data.full_name} -`
-  }
+  };
 }
 
 /**
@@ -105,7 +106,7 @@ function disableSyncButton() {
  * @param {boolean} enabled
  */
 function setSyncButtonEnabled(enabled = true) {
-  browser.contextMenus.update(OPTIONS.REFRESH_OPTION_ID, { enabled });
+  browser.contextMenus.update(CONSTANTS.REFRESH_OPTION_ID, { enabled });
 }
 
 /**
@@ -115,8 +116,8 @@ function setSyncButtonEnabled(enabled = true) {
  * @param {string} [message='']
  * @param {boolean} [requireInteraction=false] If activated notification won't automatically close
  */
-function createNotification(contextMessage = '', message = '', timeout = 5000, requireInteraction = false) {
-  browser.notifications.create('ogh-notification', {
+function createNotification(contextMessage = '', message = '', requireInteraction = false) {
+  browser.notifications.create({
     iconUrl: '../../icons/icon48.png',
     type: 'basic',
     title: 'Omni GitHub',
@@ -124,12 +125,6 @@ function createNotification(contextMessage = '', message = '', timeout = 5000, r
     message,
     requireInteraction
   });
-
-  if (timeout) {
-    setTimeout(() => {
-      browser.notifications.clear('ogh-notification');
-    }, timeout);
-  }
 }
 
 /**
@@ -149,10 +144,14 @@ async function search() {
       apiUrl.searchParams.set('page', page);
 
       const response = await fetch(apiUrl, FETCH_PARAMS);
-      const data = await response.json();
+      let data = await response.json();
 
       if (response.status >= 400) {
         throw response;
+      }
+
+      if (!showArchivedRepos) {
+        data = data.filter(repo => repo.archived);
       }
 
       items = items.concat(data.map(formatAsSuggestion));
@@ -167,7 +166,7 @@ async function search() {
     catch (e) {
       isFetching = false;
       disableSyncButton();
-      createNotification('Error syncing', 'Please provide a valid personal token in the options page', 5000);
+      createNotification('Error syncing', 'Please provide a valid personal token in the options page');
       throw e;
     }
   };
@@ -176,26 +175,16 @@ async function search() {
 }
 
 /**
- * Creates a browser alarm, which will be fired every specified period of time
- *
- * @param {string} name Alarm name
- * @param {number} periodInMinutes
- */
-function createAlarm(name, periodInMinutes) {
-  browser.alarms.clear(name, () => browser.alarms.create(name, { periodInMinutes: parseInt(periodInMinutes) }));
-}
-
-/**
  * Adds context menu buttons
  */
 function addContextButtons() {
   browser.contextMenus.create({
-    id: OPTIONS.REFRESH_OPTION_ID,
-    contexts: ['browser_action'],
+    id: CONSTANTS.REFRESH_OPTION_ID,
+    contexts: ['page_action'],
     type: 'normal',
     title: 'Synchronize repositories',
-    visible: true,
-  }, (e) => { });
+    visible: true
+  });
 }
 
 /**
@@ -206,15 +195,16 @@ function addContextButtons() {
  */
 function onBrowserStorageChanged(changes, areaName) {
   if (areaName === 'sync') {
-    if (changes[OPTIONS.TOKEN_NAME]) {
-      setToken(changes[OPTIONS.TOKEN_NAME].newValue || changes[OPTIONS.TOKEN_NAME]);
-      syncRepos(true);
+    if (changes[CONSTANTS.TOKEN_NAME]) {
+      setToken(changes[CONSTANTS.TOKEN_NAME].newValue || changes[CONSTANTS.TOKEN_NAME]);
       enableSyncButton();
     }
 
-    if (changes[OPTIONS.REFRESH_TIME]) {
-      createAlarm(ALARMS.REFRESH, changes[OPTIONS.REFRESH_TIME].newValue || changes[OPTIONS.REFRESH_TIME]);
+    if (changes[CONSTANTS.ARCHIVED_REPOS]) {
+      showArchivedRepos = changes[CONSTANTS.ARCHIVED_REPOS].newValue || changes[CONSTANTS.ARCHIVED_REPOS];
     }
+
+    syncRepos(true);
   }
 }
 
@@ -228,10 +218,7 @@ function onInputChangedHandler(text, suggest) {
   if (suggestionsCache && suggestionsCache.length) {
     suggest(highlightResults(text, suggestionsCache));
   } else {
-    syncLocalRepos(data => {
-      suggestionsCache = data;
-      suggest(highlightResults(text, suggestionsCache));
-    });
+    syncLocalRepos(data => suggest(highlightResults(text, data)));
   }
 }
 
@@ -266,16 +253,16 @@ async function syncLocalRepos(callback = () => { }) {
 /**
  * Fetches repos from GitHub and savem them into local storage
  *
- * @param {boolean} notify If active, shows a success notification
+ * @param {boolean} [notify=false] If active, shows a success notification
  * @param {function} callback
  */
-async function syncRepos(notify = false, callback = () => { }) {
+async function syncRepos(notify, callback = () => { }) {
   try {
     suggestionsCache = await search();
 
     browser.storage.local.set({ repos: suggestionsCache }, () => {
       if (notify) {
-        createNotification('Synchronization finished!', 'Your GitHub repositories has been synchronized', 5000);
+        createNotification('Synchronization finished!', 'Your GitHub repositories have been synchronized');
       }
 
       callback(suggestionsCache);
@@ -294,7 +281,6 @@ function registerListeners() {
   browser.omnibox.onInputEntered.addListener(navigate);
   browser.omnibox.onInputStarted.addListener(syncLocalRepos);
   browser.contextMenus.onClicked.addListener(() => syncRepos(true));
-  browser.alarms.onAlarm.addListener(syncRepos);
 }
 
 /**
@@ -305,15 +291,18 @@ function init() {
   registerListeners();
 
   browser.storage.sync.get({
-    [OPTIONS.TOKEN_NAME]: '',
-    [OPTIONS.REFRESH_TIME]: OPTIONS.REFRESH_TIME
-  }, userConfig => {
+    [CONSTANTS.TOKEN_NAME]: '',
+    [CONSTANTS.ARCHIVED_REPOS]: false
+  }, config => {
     try {
-      if (userConfig[OPTIONS.TOKEN_NAME]) {
-        setToken(userConfig[OPTIONS.TOKEN_NAME]);
+      showArchivedRepos = config[CONSTANTS.ARCHIVED_REPOS];
+
+      enableSyncButton();
+
+      if (config[CONSTANTS.TOKEN_NAME]) {
+        setToken(config[CONSTANTS.TOKEN_NAME]);
         syncLocalRepos(data => {
           syncRepos();
-          createAlarm(ALARMS.REFRESH, userConfig[OPTIONS.REFRESH_TIME]);
         });
       } else {
         disableSyncButton();

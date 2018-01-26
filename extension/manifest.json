@@ -14,16 +14,12 @@
   "offline_enabled": false,
   "permissions": [
     "tabs",
-    "alarms",
     "storage",
     "notifications",
     "contextMenus",
     "contentSettings",
     "https://api.github.com/user/repos"
   ],
-  "browser_action": {
-    "default_title": "Your browser action title"
-  },
   "omnibox": {
     "keyword": "gh"
   },

@@ -1,8 +1,8 @@
 const browser = window.browser || window.chrome;
 
-const OPTIONS = {
+const CONSTANTS = {
   TOKEN_NAME: 'ogh_personal_token',
-  REFRESH_TIME: 20
+  ARCHIVED_REPOS: 'archived'
 };
 
 /**
@@ -12,11 +12,11 @@ function saveOptions(e) {
   e.preventDefault();
 
   const token = document.getElementById('token').value;
-  const refresh = document.getElementById('refresh').value;
+  const archived = document.getElementById('archived').checked;
 
   browser.storage.sync.set({
-    [OPTIONS.TOKEN_NAME]: token,
-    [OPTIONS.REFRESH_TIME]: refresh
+    [CONSTANTS.TOKEN_NAME]: token,
+    [CONSTANTS.ARCHIVED_REPOS]: archived
   }, () => {
     const status = document.getElementById('status');
 
@@ -33,11 +33,11 @@ function saveOptions(e) {
  */
 function restoreOptions() {
   browser.storage.sync.get({
-    [OPTIONS.TOKEN_NAME]: '',
-    [OPTIONS.REFRESH_TIME]: OPTIONS.REFRESH_TIME
+    [CONSTANTS.TOKEN_NAME]: '',
+    [CONSTANTS.ARCHIVED_REPOS]: false
   }, item => {
-    document.getElementById('token').value = item[OPTIONS.TOKEN_NAME];
-    document.getElementById('refresh').value = item[OPTIONS.REFRESH_TIME];
+    document.getElementById('token').value = item[CONSTANTS.TOKEN_NAME];
+    document.getElementById('archived').value = item[CONSTANTS.ARCHIVED_REPOS];
   });
 }
 

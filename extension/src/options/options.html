@@ -6,7 +6,8 @@
     #status {
       color: darkgreen;
     }
-    input {
+    input[type="text"] {
+      padding: 5px 0;
       width: 100%;
     }
   </style>
@@ -24,8 +25,8 @@
     </p>
 
     <p>
-      <label for="refresh">Fetch repositories every (minutes):</label>
-      <input id="refresh" type="number" min="1" max="9999" step="1" placeholder="Time in minutes" value="15" required>
+      <input type="checkbox" name="archived" id="archived">
+      <label for="archived">Show archived repositories</label>
     </p>
 
     <p>
@@ -36,7 +37,9 @@
 
   <hr>
 
-  <small>&copy; 2018 - <a href="https://firstandthird.com/" target="_blank" title="Company website">First+Third</small>
+  <p>
+    <small>&copy; 2018 - <a href="https://firstandthird.com/" target="_blank" title="Company website">First+Third</small>
+  </p>
 
   <script src="options.js"></script>
 
