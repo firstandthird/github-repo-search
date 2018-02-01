@@ -145,10 +145,7 @@ async function search() {
 
       const response = await fetch(apiUrl, FETCH_PARAMS);
       let data = await response.json();
-
-      if (response.status >= 400) {
-        throw response;
-      }
+      const totalResults = data.length;
 
       if (!showArchivedRepos) {
         data = data.filter(repo => !repo.archived);
@@ -156,7 +153,7 @@ async function search() {
 
       items = items.concat(data.map(formatAsSuggestion));
 
-      if (!data.length || data.length < RESULTS_PER_PAGE) {
+      if (!totalResults || totalResults < RESULTS_PER_PAGE) {
         isFetching = false;
         return items;
       }
@@ -258,6 +255,7 @@ async function syncLocalRepos(callback = () => { }) {
  */
 async function syncRepos(notify, callback = () => { }) {
   try {
+    disableSyncButton();
     suggestionsCache = await search();
 
     browser.storage.local.set({ repos: suggestionsCache }, () => {
@@ -265,10 +263,11 @@ async function syncRepos(notify, callback = () => { }) {
         createNotification('Synchronization finished!', 'Your GitHub repositories have been synchronized');
       }
 
+      enableSyncButton();
       callback(suggestionsCache);
     });
   } catch (e) {
-
+    enableSyncButton();
   }
 }
 
@@ -296,8 +295,6 @@ function init() {
   }, config => {
     try {
       showArchivedRepos = config[CONSTANTS.ARCHIVED_REPOS];
-
-      enableSyncButton();
 
       if (config[CONSTANTS.TOKEN_NAME]) {
         setToken(config[CONSTANTS.TOKEN_NAME]);
