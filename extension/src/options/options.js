@@ -1,15 +1,22 @@
-/* global chrome */
+const browser = window.browser || window.chrome;
 
-const TOKEN_NAME = 'gh_personal_token';
+const CONSTANTS = {
+  TOKEN_NAME: 'ogh_personal_token',
+  ARCHIVED_REPOS: 'archived'
+};
 
 /**
- * Saves options to chrome.storage
+ * Saves options to browser.storage
  */
-function saveOptions() {
-  const token = document.getElementById('token').value;
+function saveOptions(e) {
+  e.preventDefault();
 
-  chrome.storage.sync.set({
-    [TOKEN_NAME]: token
+  const token = document.getElementById('token').value;
+  const archived = document.getElementById('archived').checked;
+
+  browser.storage.sync.set({
+    [CONSTANTS.TOKEN_NAME]: token,
+    [CONSTANTS.ARCHIVED_REPOS]: archived
   }, () => {
     const status = document.getElementById('status');
 
@@ -25,12 +32,14 @@ function saveOptions() {
  * Restores previously saved token
  */
 function restoreOptions() {
-  chrome.storage.sync.get({
-    [TOKEN_NAME]: ''
+  browser.storage.sync.get({
+    [CONSTANTS.TOKEN_NAME]: '',
+    [CONSTANTS.ARCHIVED_REPOS]: false
   }, item => {
-    document.getElementById('token').value = item[TOKEN_NAME];
+    document.getElementById('token').value = item[CONSTANTS.TOKEN_NAME];
+    document.getElementById('archived').checked = item[CONSTANTS.ARCHIVED_REPOS];
   });
 }
 
 document.addEventListener('DOMContentLoaded', restoreOptions);
-document.getElementById('save').addEventListener('click', saveOptions);
+document.getElementById('options-form').addEventListener('submit', saveOptions);

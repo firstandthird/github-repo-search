@@ -15,6 +15,8 @@
   "permissions": [
     "tabs",
     "storage",
+    "notifications",
+    "contextMenus",
     "contentSettings",
     "https://api.github.com/user/repos"
   ],
