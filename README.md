@@ -1,6 +1,6 @@
 # Github Repo Search
 
-Quickly access your Github repos from your browser omnibox.
+Quickly access your Github repos from your browser omnibox. Learn more [here](https://firstandthird.com/opensource/github-repo-search).
 
 ## Installation
 
