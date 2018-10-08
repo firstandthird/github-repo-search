@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Github Repo Search - Options</title>
+  <style>
+    #status {
+      color: darkgreen;
+    }
+    input[type="text"] {
+      padding: 5px 0;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <form id="options-form" name="options">
+    <p>
+      <label for="token">GitHub Personal token:</label>
+      <input type="text" name="token" id="token" value="" placeholder="Your token here" required>
+    </p>
+
+    <p>
+      <a href="https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/" target="_blank" title="How to get a GitHub Personal token">How to get a token?</a>
+    </p>
+
+    <p>
+      <input type="checkbox" name="archived" id="archived">
+      <label for="archived">Show archived repositories</label>
+    </p>
+
+    <p>
+      <button type="submit" id="save">Save</button>
+      <span id="status"></span>
+    </p>
+  </form>
+
+  <hr>
+
+  <p>
+    <small>&copy; 2018 - <a href="https://firstandthird.com/" target="_blank" title="Company website">First+Third</small>
+  </p>
+
+  <script src="options.js"></script>
+
+</body>
+</html>
