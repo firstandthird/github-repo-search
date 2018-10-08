@@ -290,10 +290,12 @@ function init() {
   addContextButtons();
   registerListeners();
 
-  browser.storage.sync.get({
-    [CONSTANTS.TOKEN_NAME]: '',
-    [CONSTANTS.ARCHIVED_REPOS]: false
-  }, config => {
+  const keys = {};
+
+  keys[CONSTANTS.TOKEN_NAME] = '';
+  keys[CONSTANTS.ARCHIVED_REPOS] = false;
+
+  browser.storage.sync.get(keys, config => {
     try {
       showArchivedRepos = config[CONSTANTS.ARCHIVED_REPOS];
 
