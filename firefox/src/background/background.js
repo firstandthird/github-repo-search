@@ -41,10 +41,26 @@ let suggestionsCache = [];
  * Sets token to request
  *
  * @param {string} [token='']
- * @returns
  */
 function setToken(token = '') {
   apiUrl.searchParams.set('access_token', token);
+}
+
+/**
+ * Returns the browser the extension is running on.
+ *
+ * @return {string}
+ */
+function getBrowser() {
+  if (typeof chrome !== 'undefined') {
+    if (typeof browser !== 'undefined') {
+      return 'Firefox';
+    } else {
+      return 'Chrome';
+    }
+  } else {
+    return 'Edge';
+  }
 }
 
 /**
@@ -70,15 +86,19 @@ function formatAsSuggestion(data) {
 function highlightResults(text, results) {
   try {
     const searchTextRegExp = new RegExp(text, 'i');
+    const browser = getBrowser();
 
     return results
       .filter(suggestion => searchTextRegExp.test(suggestion.description))
       .slice(0, MAX_SUGGESTIONS)
       .map(res => {
         const match = res.description.replace(searchTextRegExp, `<match>$&</match>`);
+        const description = browser === 'Chrome' ?
+          `<dim>${match}</dim> <url>${res.content}</url>` : res.content;
+
         return {
           content: res.content,
-          description: `<dim>${match}</dim> <url>${res.content}</url>`
+          description
         }
       });
   } catch (e) {
@@ -225,7 +245,7 @@ function onInputChangedHandler(text, suggest) {
  *
  * @param {string} url
  */
-function navigate(url, disposition) {
+function navigate(url) {
   try {
     new URL(url);
     browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
