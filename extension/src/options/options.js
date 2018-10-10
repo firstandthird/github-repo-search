@@ -8,8 +8,8 @@ const CONSTANTS = {
 /**
  * Saves options to browser.storage
  */
-function saveOptions(e) {
-  e.preventDefault();
+function saveOptions(event) {
+  event.preventDefault();
 
   const token = document.getElementById('token').value;
   const archived = document.getElementById('archived').checked;
