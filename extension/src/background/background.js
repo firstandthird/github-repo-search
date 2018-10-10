@@ -148,9 +148,9 @@ async function search() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw ('Please provide a valid token');
+          throw ('Please provide a valid token in the options page');
         }
-        throw ('Error retrieving your repos');
+        throw ('Error syncing your repositories');
       }
 
       const totalResults = data.length;
@@ -226,7 +226,7 @@ function onInputChangedHandler(text, suggest) {
       browser.omnibox.setDefaultSuggestion({ description: suggestions[0].description });
       suggestions.shift();
     } else {
-      browser.omnibox.setDefaultSuggestion({ description: `No results for <match>${ text }</match>` });
+      browser.omnibox.setDefaultSuggestion({ description: `No repositories found matching <match>${ text }</match>` });
     }
 
     suggest(suggestions);
@@ -338,9 +338,7 @@ function init() {
 
       if (config[CONSTANTS.TOKEN_NAME]) {
         setToken(config[CONSTANTS.TOKEN_NAME]);
-        syncLocalRepos(data => {
-          syncRepos();
-        });
+        syncLocalRepos(data => syncRepos());
       } else {
         disableSyncButton();
       }
