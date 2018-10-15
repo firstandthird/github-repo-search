@@ -50,7 +50,7 @@ function setToken(token = '') {
 /**
  * Filters a GitHub API response to match browser suggestions object
  *
- * @param {array} data
+ * @param {object} data
  * @returns
  */
 function formatAsSuggestion(data) {
@@ -63,8 +63,8 @@ function formatAsSuggestion(data) {
 /**
  * Highlights matched text
  *
- * @param {string} text
- * @param {array} results
+ * @param {string} text Text to match
+ * @param {array} results Data to match text against
  * @returns
  */
 function highlightResults(text, results) {
@@ -81,7 +81,7 @@ function highlightResults(text, results) {
           description: `<dim>${match}</dim> <url>${res.content}</url>`
         }
       });
-  } catch (e) {
+  } catch (error) {
     return [];
   }
 }
@@ -103,7 +103,7 @@ function disableSyncButton() {
 /**
  * Sets manual sync button available state (enabled/disabled)
  *
- * @param {boolean} enabled
+ * @param {boolean} [enabled=true]
  */
 function setSyncButtonEnabled(enabled = true) {
   browser.contextMenus.update(CONSTANTS.REFRESH_OPTION_ID, { enabled });
@@ -145,6 +145,14 @@ async function search() {
 
       const response = await fetch(apiUrl, FETCH_PARAMS);
       let data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw ('Please provide a valid token in the options page');
+        }
+        throw ('Error syncing your repositories');
+      }
+
       const totalResults = data.length;
 
       if (!showArchivedRepos) {
@@ -160,11 +168,10 @@ async function search() {
 
       return await getRepos(page + 1, items);
     }
-    catch (e) {
+    catch (error) {
       isFetching = false;
-      disableSyncButton();
-      createNotification('Error syncing', 'Please provide a valid personal token in the options page');
-      throw e;
+      createNotification(error);
+      throw error;
     }
   };
 
@@ -181,7 +188,7 @@ function addContextButtons() {
     type: 'normal',
     title: 'Synchronize repositories',
     visible: true
-  });
+  }, () => { });
 }
 
 /**
@@ -208,37 +215,71 @@ function onBrowserStorageChanged(changes, areaName) {
 /**
  * Fired on every input change
  *
- * @param {text} text User entered text
+ * @param {string} text User entered text
  * @param {function} suggest Opens the suggestions box
  */
 function onInputChangedHandler(text, suggest) {
+  getSuggestionsCache(suggestionsCache => {
+    const suggestions = highlightResults(text, suggestionsCache);
+
+    if (suggestions.length) {
+      browser.omnibox.setDefaultSuggestion({ description: suggestions[0].description });
+      suggestions.shift();
+    } else {
+      browser.omnibox.setDefaultSuggestion({ description: `No repositories found matching <match>${ text }</match>` });
+    }
+
+    suggest(suggestions);
+  });
+}
+
+/**
+ * Returns the suggested repos cache if exists, otherwise syncs and returns repos
+ *
+ * @param {function} [callback] Callback function with cached repos array
+ */
+function getSuggestionsCache(callback = () => {}) {
   if (suggestionsCache && suggestionsCache.length) {
-    suggest(highlightResults(text, suggestionsCache));
+    callback(suggestionsCache);
   } else {
-    syncLocalRepos(data => suggest(highlightResults(text, data)));
+    syncLocalRepos(repos => callback(repos));
   }
 }
 
 /**
- * Navigates to the given URL
+ * Navigates to the given URL or filters cached results if not url provided
  *
- * @param {string} url
+ * @param {string} userInput
  */
-function navigate(url, disposition) {
+function onInputEnteredHandler(userInput) {
+  let url;
+
   try {
-    new URL(url);
-    browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      browser.tabs.update(tabs[0].id, { url: url });
+    url = new URL(userInput).href;
+  }
+  catch (error) {
+    getSuggestionsCache(suggestionsCache => {
+      const suggestions = highlightResults(userInput, suggestionsCache);
+
+      if (suggestions.length) {
+        url = suggestions[0].content;
+      }
     });
-  } catch (e) { }
+  }
+
+  if (url) {
+    browser.tabs.query({ active: true, currentWindow: true }, tabs => {
+      browser.tabs.update(tabs[0].id, { url });
+    });
+  }
 }
 
 /**
  * Synchronizes local stored repositories
  *
- * @param {function} callback
+ * @param {function} [callback]
  */
-async function syncLocalRepos(callback = () => { }) {
+async function syncLocalRepos(callback = () => {}) {
   browser.storage.local.get({
     'repos': []
   }, data => {
@@ -251,24 +292,23 @@ async function syncLocalRepos(callback = () => { }) {
  * Fetches repos from GitHub and savem them into local storage
  *
  * @param {boolean} [notify=false] If active, shows a success notification
- * @param {function} callback
+ * @param {function} [callback]
  */
-async function syncRepos(notify, callback = () => { }) {
-  try {
-    disableSyncButton();
-    suggestionsCache = await search();
+async function syncRepos(notify = false, callback = () => {}) {
+  disableSyncButton();
 
-    browser.storage.local.set({ repos: suggestionsCache }, () => {
-      if (notify) {
-        createNotification('Synchronization finished!', 'Your GitHub repositories have been synchronized');
-      }
+  search()
+    .then(suggestionsCache => {
+      browser.storage.local.set({ repos: suggestionsCache }, () => {
+        if (notify) {
+          createNotification('Synchronization finished!', 'Your GitHub repositories have been synchronized');
+        }
 
-      enableSyncButton();
-      callback(suggestionsCache);
-    });
-  } catch (e) {
-    enableSyncButton();
-  }
+        enableSyncButton();
+        callback(suggestionsCache);
+      });
+    })
+    .catch(error => enableSyncButton());
 }
 
 /**
@@ -277,7 +317,7 @@ async function syncRepos(notify, callback = () => { }) {
 function registerListeners() {
   browser.storage.onChanged.addListener(onBrowserStorageChanged);
   browser.omnibox.onInputChanged.addListener(onInputChangedHandler);
-  browser.omnibox.onInputEntered.addListener(navigate);
+  browser.omnibox.onInputEntered.addListener(onInputEnteredHandler);
   browser.omnibox.onInputStarted.addListener(syncLocalRepos);
   browser.contextMenus.onClicked.addListener(() => syncRepos(true));
 }
@@ -298,9 +338,7 @@ function init() {
 
       if (config[CONSTANTS.TOKEN_NAME]) {
         setToken(config[CONSTANTS.TOKEN_NAME]);
-        syncLocalRepos(data => {
-          syncRepos();
-        });
+        syncLocalRepos(data => syncRepos());
       } else {
         disableSyncButton();
       }
