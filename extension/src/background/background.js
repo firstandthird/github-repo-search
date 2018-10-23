@@ -383,7 +383,7 @@ function openOptionsPage() {
  * @param {string} notificationId
  */
 function onNotificationClicked(notificationId) {
-  if (notificationId === NOTIFICATIONS.installed.id || notificationId === NOTIFICATIONS.syncError.id) {
+  if (notificationId === NOTIFICATIONS.installed.id || notificationId === NOTIFICATIONS.tokenError.id) {
     openOptionsPage();
   }
 };
