@@ -5,8 +5,51 @@ const browser = window.browser || window.chrome;
  */
 const CONSTANTS = {
   TOKEN_NAME: 'ogh_personal_token',
-  REFRESH_OPTION_ID: 'ogh-refresh',
-  ARCHIVED_REPOS: 'archived'
+  ARCHIVED_REPOS: 'archived',
+
+};
+
+const CONTEXT_MENU = {
+  id: 'ogh-sync-option',
+  syncRepos: {
+    title: 'Synchronize repositories',
+    enabled: true,
+    onclick: null
+  },
+  addToken: {
+    title: 'Please provide a valid token',
+    enabled: true,
+    onclick: openOptionsPage
+  }
+};
+
+const NOTIFICATIONS = {
+  installed: {
+    id: 'oghInstalled',
+    content: {
+      contextMessage: 'Successful installation',
+      message: 'Open extension options and add a token to get started'
+    }
+  },
+  syncSuccess: {
+    content: {
+      contextMessage: 'Synchronization finished!',
+      message: 'Your GitHub repositories have been synchronized'
+    }
+  },
+  tokenError: {
+    id: 'oghTokenError',
+    content: {
+      contextMessage: 'Invalid token',
+      message: 'Please provide a valid token in the options page'
+    }
+  },
+  syncError: {
+    content: {
+      contextMessage: 'Invalid token',
+      message: 'Error syncing your repositories'
+    }
+  }
 };
 
 const MAX_SUGGESTIONS = 10;
@@ -90,47 +133,45 @@ function highlightResults(text, results) {
  * Enables manual sync button
  */
 function enableSyncButton() {
-  setSyncButtonEnabled(true);
+  browser.contextMenus.update(CONTEXT_MENU.id, Object.assign(CONTEXT_MENU.syncRepos, { enabled: true }));
 }
 
 /**
  * Disables manual sync button
  */
 function disableSyncButton() {
-  setSyncButtonEnabled(false)
+  browser.contextMenus.update(CONTEXT_MENU.id, Object.assign(CONTEXT_MENU.syncRepos, { enabled: false }));
 }
 
 /**
- * Sets manual sync button available state (enabled/disabled)
- *
- * @param {boolean} [enabled=true]
+ * Disables manual sync button
  */
-function setSyncButtonEnabled(enabled = true) {
-  browser.contextMenus.update(CONSTANTS.REFRESH_OPTION_ID, { enabled });
+function setInvalidTokenButton() {
+  browser.contextMenus.update(CONTEXT_MENU.id, CONTEXT_MENU.addToken);
 }
 
 /**
  * Creates a notification with the specified params
  *
- * @param {string} [contextMessage='']
- * @param {string} [message='']
- * @param {boolean} [requireInteraction=false] If activated notification won't automatically close
+ * @param {Object} notification - Notification object
+ * @param {string} [notification.id=null] - Notification ID
+ * @param {Object} [notification.content={}] - Notification options (title, message...)
  */
-function createNotification(contextMessage = '', message = '', requireInteraction = false) {
-  browser.notifications.create({
+function createNotification({ id = null, content = {} }) {
+  const notification = Object.assign({
     iconUrl: '../../icons/icon48.png',
-    type: 'basic',
     title: 'Github Repo Search',
-    contextMessage,
-    message,
-    requireInteraction
-  });
+    type: 'basic'
+  }, content);
+
+  browser.notifications.create(id, notification);
 }
 
 /**
  * Fetches GitHub user repos
  *
- * @returns {Promise}
+ * @async
+ * @returns {Promise<Array>}
  */
 async function search() {
   if (isFetching) {
@@ -148,9 +189,14 @@ async function search() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw ('Please provide a valid token in the options page');
+          setInvalidTokenButton();
+          createNotification(NOTIFICATIONS.tokenError);
+        } else {
+          enableSyncButton();
+          createNotification(NOTIFICATIONS.syncError);
         }
-        throw ('Error syncing your repositories');
+
+        throw ('Error fetching repos');
       }
 
       const totalResults = data.length;
@@ -170,7 +216,6 @@ async function search() {
     }
     catch (error) {
       isFetching = false;
-      createNotification(error);
       throw error;
     }
   };
@@ -183,7 +228,7 @@ async function search() {
  */
 function addContextButtons() {
   browser.contextMenus.create({
-    id: CONSTANTS.REFRESH_OPTION_ID,
+    id: CONTEXT_MENU.id,
     contexts: ['page_action'],
     type: 'normal',
     title: 'Synchronize repositories',
@@ -249,7 +294,7 @@ function getSuggestionsCache(callback = () => {}) {
 /**
  * Navigates to the given URL or filters cached results if not url provided
  *
- * @param {string} userInput
+ * @param {string} userInput Text entered by the user
  */
 function onInputEnteredHandler(userInput) {
   let url;
@@ -277,6 +322,7 @@ function onInputEnteredHandler(userInput) {
 /**
  * Synchronizes local stored repositories
  *
+ * @async
  * @param {function} [callback]
  */
 async function syncLocalRepos(callback = () => {}) {
@@ -291,6 +337,7 @@ async function syncLocalRepos(callback = () => {}) {
 /**
  * Fetches repos from GitHub and savem them into local storage
  *
+ * @async
  * @param {boolean} [notify=false] If active, shows a success notification
  * @param {function} [callback]
  */
@@ -301,15 +348,45 @@ async function syncRepos(notify = false, callback = () => {}) {
     .then(suggestionsCache => {
       browser.storage.local.set({ repos: suggestionsCache }, () => {
         if (notify) {
-          createNotification('Synchronization finished!', 'Your GitHub repositories have been synchronized');
+          createNotification(NOTIFICATIONS.syncSuccess);
         }
 
         enableSyncButton();
         callback(suggestionsCache);
       });
     })
-    .catch(error => enableSyncButton());
+    .catch(error => {})
 }
+
+/**
+ * Run after extension is installed
+ */
+function onExtensionInstall() {
+  setInvalidTokenButton();
+  createNotification(NOTIFICATIONS.installed);
+}
+
+/**
+ * Opens extension options page
+ */
+function openOptionsPage() {
+  if (browser.runtime.openOptionsPage) {
+    browser.runtime.openOptionsPage();
+  } else {
+    window.open(browser.runtime.getURL('src/options/options.html'));
+  }
+}
+
+/**
+ * Notification click handler
+ *
+ * @param {string} notificationId
+ */
+function onNotificationClicked(notificationId) {
+  if (notificationId === NOTIFICATIONS.installed.id || notificationId === NOTIFICATIONS.tokenError.id) {
+    openOptionsPage();
+  }
+};
 
 /**
  * Register event listeners
@@ -320,6 +397,8 @@ function registerListeners() {
   browser.omnibox.onInputEntered.addListener(onInputEnteredHandler);
   browser.omnibox.onInputStarted.addListener(syncLocalRepos);
   browser.contextMenus.onClicked.addListener(() => syncRepos(true));
+  browser.runtime.onInstalled.addListener(onExtensionInstall);
+  browser.notifications.onClicked.addListener(onNotificationClicked);
 }
 
 /**
