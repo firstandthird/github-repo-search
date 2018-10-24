@@ -164,6 +164,7 @@ function createNotification({ id = null, content = {} }) {
     type: 'basic'
   }, content);
 
+  browser.notifications.clear(id);
   browser.notifications.create(id, notification);
 }
 
@@ -355,15 +356,19 @@ async function syncRepos(notify = false, callback = () => {}) {
         callback(suggestionsCache);
       });
     })
-    .catch(error => {})
+    .catch(error => {});
 }
 
 /**
  * Run after extension is installed
  */
 function onExtensionInstall() {
-  setInvalidTokenButton();
-  createNotification(NOTIFICATIONS.installed);
+  getConfig(config => {
+    if (!config[CONSTANTS.TOKEN_NAME]) {
+      setInvalidTokenButton();
+      createNotification(NOTIFICATIONS.installed);
+    }
+  });
 }
 
 /**
@@ -402,16 +407,25 @@ function registerListeners() {
 }
 
 /**
+ * Returns extension saved config
+ *
+ * @param {function} [callback] Callback function
+ */
+function getConfig(callback = () => {}) {
+  browser.storage.sync.get({
+    [CONSTANTS.TOKEN_NAME]: '',
+    [CONSTANTS.ARCHIVED_REPOS]: false
+  }, config => callback(config));
+}
+
+/**
  * Called on plugin load
  */
 function init() {
   addContextButtons();
   registerListeners();
 
-  browser.storage.sync.get({
-    [CONSTANTS.TOKEN_NAME]: '',
-    [CONSTANTS.ARCHIVED_REPOS]: false
-  }, config => {
+  getConfig(config => {
     try {
       showArchivedRepos = config[CONSTANTS.ARCHIVED_REPOS];
 
