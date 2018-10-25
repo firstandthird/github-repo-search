@@ -1,6 +1,6 @@
 {
   "name": "github-repo-search",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "private": true,
   "description": "Quickly access your Github repos from your browser omnibox",
   "main": "extension/background/background.js",
