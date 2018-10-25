@@ -5,16 +5,20 @@ const browser = window.browser || window.chrome;
  */
 const CONSTANTS = {
   TOKEN_NAME: 'ogh_personal_token',
-  ARCHIVED_REPOS: 'archived',
-
+  ARCHIVED_REPOS: 'archived'
 };
 
 const CONTEXT_MENU = {
   id: 'ogh-sync-option',
+  syncDisabled: {
+    title: 'Synchronizing repositories...',
+    enabled: false,
+    onclick: null
+  },
   syncRepos: {
     title: 'Synchronize repositories',
     enabled: true,
-    onclick: null
+    onclick: () => syncRepos(true)
   },
   addToken: {
     title: 'Please provide a valid token',
@@ -118,11 +122,12 @@ function highlightResults(text, results) {
       .filter(suggestion => searchTextRegExp.test(suggestion.description))
       .slice(0, MAX_SUGGESTIONS)
       .map(res => {
-        const match = res.description.replace(searchTextRegExp, `<match>$&</match>`);
+        const match = res.description.replace(searchTextRegExp, '<match>$&</match>');
+
         return {
           content: res.content,
           description: `<dim>${match}</dim> <url>${res.content}</url>`
-        }
+        };
       });
   } catch (error) {
     return [];
@@ -133,14 +138,14 @@ function highlightResults(text, results) {
  * Enables manual sync button
  */
 function enableSyncButton() {
-  browser.contextMenus.update(CONTEXT_MENU.id, Object.assign(CONTEXT_MENU.syncRepos, { enabled: true }));
+  browser.contextMenus.update(CONTEXT_MENU.id, CONTEXT_MENU.syncRepos);
 }
 
 /**
  * Disables manual sync button
  */
 function disableSyncButton() {
-  browser.contextMenus.update(CONTEXT_MENU.id, Object.assign(CONTEXT_MENU.syncRepos, { enabled: false }));
+  browser.contextMenus.update(CONTEXT_MENU.id, CONTEXT_MENU.syncDisabled);
 }
 
 /**
@@ -154,17 +159,20 @@ function setInvalidTokenButton() {
  * Creates a notification with the specified params
  *
  * @param {Object} notification - Notification object
- * @param {string} [notification.id=null] - Notification ID
+ * @param {string} [notification.id] - Notification ID
  * @param {Object} [notification.content={}] - Notification options (title, message...)
  */
-function createNotification({ id = null, content = {} }) {
+function createNotification({ id, content = {} }) {
   const notification = Object.assign({
     iconUrl: '../../icons/icon48.png',
     title: 'Github Repo Search',
     type: 'basic'
   }, content);
 
-  browser.notifications.clear(id);
+  if (id) {
+    browser.notifications.clear(id);
+  }
+
   browser.notifications.create(id, notification);
 }
 
@@ -286,10 +294,10 @@ function onInputChangedHandler(text, suggest) {
  */
 function getSuggestionsCache(callback = () => {}) {
   if (suggestionsCache && suggestionsCache.length) {
-    callback(suggestionsCache);
-  } else {
-    syncLocalRepos(repos => callback(repos));
+    return callback(suggestionsCache);
   }
+
+  syncLocalRepos(repos => callback(repos));
 }
 
 /**
@@ -401,7 +409,6 @@ function registerListeners() {
   browser.omnibox.onInputChanged.addListener(onInputChangedHandler);
   browser.omnibox.onInputEntered.addListener(onInputEnteredHandler);
   browser.omnibox.onInputStarted.addListener(syncLocalRepos);
-  browser.contextMenus.onClicked.addListener(() => syncRepos(true));
   browser.runtime.onInstalled.addListener(onExtensionInstall);
   browser.notifications.onClicked.addListener(onNotificationClicked);
 }
