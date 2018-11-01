@@ -18,7 +18,7 @@
   "bugs": {
     "url": "https://github.com/firstandthird/github-repo-search/issues"
   },
-  "homepage": "https://github.com/firstandthird/github-repo-search",
+  "homepage": "https://firstandthird.com/opensource/github-repo-search",
   "devDependencies": {
     "eslint-config-firstandthird": "4.3.0",
     "eslint-plugin-import": "2.8.0"
