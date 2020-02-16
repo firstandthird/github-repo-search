@@ -1,4 +1,5 @@
 const browser = window.browser || window.chrome;
+const isDarkMode = matchMedia('(prefers-color-scheme: dark)').matches;
 
 /**
  * Default config
@@ -7,6 +8,9 @@ const CONSTANTS = {
   TOKEN_NAME: 'ogh_personal_token',
   ARCHIVED_REPOS: 'archived'
 };
+
+const isFirefox = typeof InstallTrigger !== 'undefined';
+const isChrome = !isFirefox;
 
 const CONTEXT_MENU = {
   id: 'ogh-sync-option',
@@ -63,7 +67,10 @@ const RESULTS_PER_PAGE = 100;
 const FETCH_PARAMS = {
   method: 'GET',
   mode: 'cors',
-  cache: 'default'
+  cache: 'default',
+  headers: {
+    Authorization: ''
+  }
 };
 
 const apiUrl = new URL('https://api.github.com/user/repos');
@@ -91,7 +98,7 @@ let suggestionsCache = [];
  * @returns
  */
 function setToken(token = '') {
-  apiUrl.searchParams.set('access_token', token);
+  FETCH_PARAMS.headers.Authorization = `token ${token}`;
 }
 
 /**
@@ -108,6 +115,29 @@ function formatAsSuggestion(data) {
 }
 
 /**
+ * Checks matches trying to use repo name.
+ * @param {string} description
+ * @param {RegExp} text
+ * @param {boolean} onlyRepo
+ * @returns {boolean}
+ */
+function isMatch(description, text, onlyRepo) {
+  const matchText = onlyRepo ? description.split('/').pop() : description;
+  return text.test(matchText);
+}
+
+/**
+ * Function that exposes current status
+ * @returns {{isFetching: boolean, token: string}}
+ */
+function getStatus() {
+  return {
+    isFetching,
+    token: FETCH_PARAMS.headers.Authorization
+  }
+}
+
+/**
  * Highlights matched text
  *
  * @param {string} text Text to match
@@ -117,42 +147,55 @@ function formatAsSuggestion(data) {
 function highlightResults(text, results) {
   try {
     const searchTextRegExp = new RegExp(text, 'i');
+    const highlights = [];
+    const added = {};
+    const length = results.length;
 
-    return results
-      .filter(suggestion => searchTextRegExp.test(suggestion.description))
-      .slice(0, MAX_SUGGESTIONS)
+    // Only searching on repo name first
+    for (let i = 0; i < length; i++) {
+      const repo = results[i];
+
+      if (isMatch(repo.description, searchTextRegExp, true)) {
+        highlights.push(repo);
+        added[repo.description] = true;
+
+        if (highlights.length === MAX_SUGGESTIONS) {
+          break;
+        }
+      }
+    }
+
+    // If not enough suggestions, try the org/user too
+    for (let i = 0; i < length; i++) {
+      const repo = results[i];
+
+      if (!added[repo.description] && isMatch(repo.description, searchTextRegExp, false)) {
+        highlights.push(repo);
+
+        if (highlights.length === MAX_SUGGESTIONS) {
+          break;
+        }
+      }
+    }
+
+    return highlights
       .map(res => {
-        const match = res.description.replace(searchTextRegExp, '<match>$&</match>');
+        let match = res.description;
+        let description = match;
+
+        if (isChrome) {
+          match = match.replace(searchTextRegExp, '<match>$&</match>');
+          description = `<dim>${match}</dim> <url>${res.content}</url>`;
+        }
 
         return {
           content: res.content,
-          description: `<dim>${match}</dim> <url>${res.content}</url>`
+          description
         };
       });
   } catch (error) {
     return [];
   }
-}
-
-/**
- * Enables manual sync button
- */
-function enableSyncButton() {
-  browser.contextMenus.update(CONTEXT_MENU.id, CONTEXT_MENU.syncRepos);
-}
-
-/**
- * Disables manual sync button
- */
-function disableSyncButton() {
-  browser.contextMenus.update(CONTEXT_MENU.id, CONTEXT_MENU.syncDisabled);
-}
-
-/**
- * Disables manual sync button
- */
-function setInvalidTokenButton() {
-  browser.contextMenus.update(CONTEXT_MENU.id, CONTEXT_MENU.addToken);
 }
 
 /**
@@ -163,8 +206,9 @@ function setInvalidTokenButton() {
  * @param {Object} [notification.content={}] - Notification options (title, message...)
  */
 function createNotification({ id, content = {} }) {
+  const icon = isDarkMode ? 'icon48_light.png' : 'icon48.png';
   const notification = Object.assign({
-    iconUrl: '../../icons/icon48.png',
+    iconUrl: `../../icons/${icon}`,
     title: 'Github Repo Search',
     type: 'basic'
   }, content);
@@ -198,10 +242,8 @@ async function search() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          setInvalidTokenButton();
           createNotification(NOTIFICATIONS.tokenError);
         } else {
-          enableSyncButton();
           createNotification(NOTIFICATIONS.syncError);
         }
 
@@ -233,19 +275,6 @@ async function search() {
 }
 
 /**
- * Adds context menu buttons
- */
-function addContextButtons() {
-  browser.contextMenus.create({
-    id: CONTEXT_MENU.id,
-    contexts: ['page_action'],
-    type: 'normal',
-    title: 'Synchronize repositories',
-    visible: true
-  }, () => { });
-}
-
-/**
  * Handles browser storage changes
  *
  * @param {Object} changes
@@ -255,7 +284,6 @@ function onBrowserStorageChanged(changes, areaName) {
   if (areaName === 'sync') {
     if (changes[CONSTANTS.TOKEN_NAME]) {
       setToken(changes[CONSTANTS.TOKEN_NAME].newValue || changes[CONSTANTS.TOKEN_NAME]);
-      enableSyncButton();
     }
 
     if (changes[CONSTANTS.ARCHIVED_REPOS]) {
@@ -278,9 +306,16 @@ function onInputChangedHandler(text, suggest) {
 
     if (suggestions.length) {
       browser.omnibox.setDefaultSuggestion({ description: suggestions[0].description });
-      suggestions.shift();
+
+      if (isChrome) {
+        suggestions.shift();
+      }
     } else {
-      browser.omnibox.setDefaultSuggestion({ description: `No repositories found matching <match>${ text }</match>` });
+      const description = isFirefox ?
+        `No repositories found matching "${text}"` :
+        `No repositories found matching <match>${text}</match>`;
+
+      browser.omnibox.setDefaultSuggestion({ description });
     }
 
     suggest(suggestions);
@@ -304,8 +339,10 @@ function getSuggestionsCache(callback = () => {}) {
  * Navigates to the given URL or filters cached results if not url provided
  *
  * @param {string} userInput Text entered by the user
+ * @param {string} disposition Describes how the extension should handle a user selection
+ * from the suggestions in the address bar's drop-down list.
  */
-function onInputEnteredHandler(userInput) {
+function onInputEnteredHandler(userInput, disposition) {
   let url;
 
   try {
@@ -322,9 +359,17 @@ function onInputEnteredHandler(userInput) {
   }
 
   if (url) {
-    browser.tabs.query({ active: true, currentWindow: true }, tabs => {
-      browser.tabs.update(tabs[0].id, { url });
-    });
+    switch (disposition) {
+      case 'newForegroundTab':
+        browser.tabs.create({ url });
+        break;
+      case 'newBackgroundTab':
+        browser.tabs.create({ url, 'active': false});
+        break;
+      case 'currentTab':
+      default:
+        browser.tabs.update({ url });
+    }
   }
 }
 
@@ -351,8 +396,6 @@ async function syncLocalRepos(callback = () => {}) {
  * @param {function} [callback]
  */
 async function syncRepos(notify = false, callback = () => {}) {
-  disableSyncButton();
-
   search()
     .then(suggestionsCache => {
       browser.storage.local.set({ repos: suggestionsCache }, () => {
@@ -360,11 +403,10 @@ async function syncRepos(notify = false, callback = () => {}) {
           createNotification(NOTIFICATIONS.syncSuccess);
         }
 
-        enableSyncButton();
         callback(suggestionsCache);
       });
     })
-    .catch(error => {});
+    .catch(() => {});
 }
 
 /**
@@ -373,7 +415,6 @@ async function syncRepos(notify = false, callback = () => {}) {
 function onExtensionInstall() {
   getConfig(config => {
     if (!config[CONSTANTS.TOKEN_NAME]) {
-      setInvalidTokenButton();
       createNotification(NOTIFICATIONS.installed);
     }
   });
@@ -399,18 +440,25 @@ function onNotificationClicked(notificationId) {
   if (notificationId === NOTIFICATIONS.installed.id || notificationId === NOTIFICATIONS.tokenError.id) {
     openOptionsPage();
   }
-};
+}
 
 /**
  * Register event listeners
  */
 function registerListeners() {
   browser.storage.onChanged.addListener(onBrowserStorageChanged);
+
   browser.omnibox.onInputChanged.addListener(onInputChangedHandler);
   browser.omnibox.onInputEntered.addListener(onInputEnteredHandler);
+
   browser.omnibox.onInputStarted.addListener(syncLocalRepos);
   browser.runtime.onInstalled.addListener(onExtensionInstall);
   browser.notifications.onClicked.addListener(onNotificationClicked);
+
+  browser.omnibox.setDefaultSuggestion({
+    description: `Search for a Github Repo
+    (e.g. "jquery")`
+  });
 }
 
 /**
@@ -429,7 +477,6 @@ function getConfig(callback = () => {}) {
  * Called on plugin load
  */
 function init() {
-  addContextButtons();
   registerListeners();
 
   getConfig(config => {
@@ -438,9 +485,7 @@ function init() {
 
       if (config[CONSTANTS.TOKEN_NAME]) {
         setToken(config[CONSTANTS.TOKEN_NAME]);
-        syncLocalRepos(data => syncRepos());
-      } else {
-        disableSyncButton();
+        syncLocalRepos(() => syncRepos());
       }
     } catch (error) {
       console.log(error);

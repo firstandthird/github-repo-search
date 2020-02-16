@@ -24,7 +24,7 @@ function saveOptions(event) {
 
     setTimeout(() => {
       status.textContent = '';
-    }, 750);
+    }, 1500);
   });
 }
 

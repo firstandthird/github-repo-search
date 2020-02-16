@@ -5,9 +5,9 @@
   "version": "2.2.3",
   "short_name": "GitHub Repos",
   "icons": {
-    "16": "icons/icon.svg",
-    "48": "icons/icon.svg",
-    "128": "icons/icon.svg"
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "homepage_url": "https://firstandthird.com/opensource/github-repo-search",
   "author": "First+Third <code@firstandthird.com> (http://firstandthird.com/)",
@@ -16,12 +16,6 @@
     "notifications",
     "https://api.github.com/user/repos"
   ],
-  "applications": {
-    "gecko": {
-      "id": "githubreposearch@firstandthird.com",
-      "strict_min_version": "72.0"
-    }
-  },
   "browser_action": {
     "default_icon": {
       "32" : "icons/icon.svg"

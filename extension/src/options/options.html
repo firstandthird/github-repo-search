@@ -6,9 +6,29 @@
     #status {
       color: darkgreen;
     }
+
     input[type="text"] {
       padding: 5px 0;
       width: 100%;
+    }
+
+    a {
+      color: #45a1ff;
+    }
+
+    body {
+      padding: 10px;
+    }
+
+    label + input {
+      margin-top: 10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #202023;
+        color: #fff;
+      }
     }
   </style>
 </head>
@@ -35,7 +55,7 @@
     </p>
 
     <small>
-      <strong>Privacy:</strong> The extension only reads repository names and never writes to your repos. You can <a href="https://github.com/firstandthird/github-repo-search" target="_blank" title="See Github Repos Code">see the code here</a> (only endpoint hit is GET /user/repos).
+      <strong>Privacy:</strong> This extension only reads repository names and never writes to your repos. You can <a href="https://github.com/firstandthird/github-repo-search" target="_blank" title="See Github Repos Code">see the code here</a> (only endpoint being hit is GET /user/repos).
     </small>
   </form>
 
@@ -46,6 +66,5 @@
   </p>
 
   <script src="options.js"></script>
-
 </body>
 </html>

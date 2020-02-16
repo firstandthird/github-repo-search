@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      min-width: 200px;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    li + li {
+      margin-top: 10px;
+    }
+
+    li button {
+      cursor: pointer;
+      width: 100%;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      border: none;
+      padding: 0 5px;
+      background-color: transparent;
+      text-align: left;
+    }
+
+    li button:hover {
+      text-decoration: underline;
+    }
+
+    button[disabled] {
+      cursor: not-allowed;
+      opacity: .6;
+    }
+
+    button[disabled]:hover {
+      text-decoration: none;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #4a4a4f;
+        color: #fff;
+      }
+
+      button {
+        color: #fff;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <ul>
+    <li><button id="options">Open options</button></li>
+    <li><button id="sync">Sync now</button></li>
+  </ul>
+  <script src="popup.js"></script>
+</body>
+</html>
