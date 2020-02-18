@@ -479,6 +479,12 @@ function getConfig(callback = () => {}) {
 function init() {
   registerListeners();
 
+  if (isDarkMode) {
+    browser.browserAction.setIcon({
+      path: 'icons/icon48_light.png'
+    });
+  }
+
   getConfig(config => {
     try {
       showArchivedRepos = config[CONSTANTS.ARCHIVED_REPOS];
