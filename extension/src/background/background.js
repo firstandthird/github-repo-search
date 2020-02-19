@@ -12,25 +12,6 @@ const CONSTANTS = {
 const isFirefox = typeof InstallTrigger !== 'undefined';
 const isChrome = !isFirefox;
 
-const CONTEXT_MENU = {
-  id: 'ogh-sync-option',
-  syncDisabled: {
-    title: 'Synchronizing repositories...',
-    enabled: false,
-    onclick: null
-  },
-  syncRepos: {
-    title: 'Synchronize repositories',
-    enabled: true,
-    onclick: () => syncRepos(true)
-  },
-  addToken: {
-    title: 'Please provide a valid token',
-    enabled: true,
-    onclick: openOptionsPage
-  }
-};
-
 const NOTIFICATIONS = {
   installed: {
     id: 'oghInstalled',
@@ -62,7 +43,7 @@ const NOTIFICATIONS = {
 
 const MAX_SUGGESTIONS = 10;
 
-const RESULTS_PER_PAGE = 100;
+const RESULTS_PER_PAGE = '100';
 
 const FETCH_PARAMS = {
   method: 'GET',
@@ -130,11 +111,11 @@ function isMatch(description, text, onlyRepo) {
  * Function that exposes current status
  * @returns {{isFetching: boolean, token: string}}
  */
-function getStatus() {
+function getStatus() { // eslint-disable-line no-unused-vars
   return {
     isFetching,
     token: FETCH_PARAMS.headers.Authorization
-  }
+  };
 }
 
 /**
@@ -233,7 +214,7 @@ async function search() {
 
   isFetching = true;
 
-  const getRepos = async (page = 1, items = []) => {
+  const getRepos = async (page = '1', items = []) => {
     try {
       apiUrl.searchParams.set('page', page);
 
@@ -247,7 +228,7 @@ async function search() {
           createNotification(NOTIFICATIONS.syncError);
         }
 
-        throw ('Error fetching repos');
+        throw new Error('Error fetching repos');
       }
 
       const totalResults = data.length;
@@ -264,14 +245,34 @@ async function search() {
       }
 
       return await getRepos(page + 1, items);
-    }
-    catch (error) {
+    } catch (error) {
       isFetching = false;
       throw error;
     }
   };
 
   return getRepos();
+}
+
+/**
+ * Fetches repos from GitHub and savem them into local storage
+ *
+ * @async
+ * @param {boolean} [notify=false] If active, shows a success notification
+ * @param {function} [callback]
+ */
+async function syncRepos(notify = false, callback = () => { }) {
+  search()
+    .then(suggestionsCache => {
+      browser.storage.local.set({ repos: suggestionsCache }, () => {
+        if (notify) {
+          createNotification(NOTIFICATIONS.syncSuccess);
+        }
+
+        callback(suggestionsCache);
+      });
+    })
+    .catch(() => { });
 }
 
 /**
@@ -292,6 +293,34 @@ function onBrowserStorageChanged(changes, areaName) {
 
     syncRepos(true);
   }
+}
+
+/**
+ * Synchronizes local stored repositories
+ *
+ * @async
+ * @param {function} [callback]
+ */
+async function syncLocalRepos(callback = () => { }) {
+  browser.storage.local.get({
+    repos: []
+  }, data => {
+    suggestionsCache = data.repos;
+    callback(data.repos);
+  });
+}
+
+/**
+ * Returns the suggested repos cache if exists, otherwise syncs and returns repos
+ *
+ * @param {function} [callback] Callback function with cached repos array
+ */
+function getSuggestionsCache(callback = () => { }) {
+  if (suggestionsCache && suggestionsCache.length) {
+    return callback(suggestionsCache);
+  }
+
+  syncLocalRepos(repos => callback(repos));
 }
 
 /**
@@ -323,19 +352,6 @@ function onInputChangedHandler(text, suggest) {
 }
 
 /**
- * Returns the suggested repos cache if exists, otherwise syncs and returns repos
- *
- * @param {function} [callback] Callback function with cached repos array
- */
-function getSuggestionsCache(callback = () => {}) {
-  if (suggestionsCache && suggestionsCache.length) {
-    return callback(suggestionsCache);
-  }
-
-  syncLocalRepos(repos => callback(repos));
-}
-
-/**
  * Navigates to the given URL or filters cached results if not url provided
  *
  * @param {string} userInput Text entered by the user
@@ -347,8 +363,7 @@ function onInputEnteredHandler(userInput, disposition) {
 
   try {
     url = new URL(userInput).href;
-  }
-  catch (error) {
+  } catch (error) {
     getSuggestionsCache(suggestionsCache => {
       const suggestions = highlightResults(userInput, suggestionsCache);
 
@@ -364,7 +379,7 @@ function onInputEnteredHandler(userInput, disposition) {
         browser.tabs.create({ url });
         break;
       case 'newBackgroundTab':
-        browser.tabs.create({ url, 'active': false});
+        browser.tabs.create({ url, active: false });
         break;
       case 'currentTab':
       default:
@@ -374,39 +389,15 @@ function onInputEnteredHandler(userInput, disposition) {
 }
 
 /**
- * Synchronizes local stored repositories
+ * Returns extension saved config
  *
- * @async
- * @param {function} [callback]
+ * @param {function} [callback] Callback function
  */
-async function syncLocalRepos(callback = () => {}) {
-  browser.storage.local.get({
-    'repos': []
-  }, data => {
-    suggestionsCache = data.repos;
-    callback(data.repos);
-  });
-}
-
-/**
- * Fetches repos from GitHub and savem them into local storage
- *
- * @async
- * @param {boolean} [notify=false] If active, shows a success notification
- * @param {function} [callback]
- */
-async function syncRepos(notify = false, callback = () => {}) {
-  search()
-    .then(suggestionsCache => {
-      browser.storage.local.set({ repos: suggestionsCache }, () => {
-        if (notify) {
-          createNotification(NOTIFICATIONS.syncSuccess);
-        }
-
-        callback(suggestionsCache);
-      });
-    })
-    .catch(() => {});
+function getConfig(callback = () => { }) {
+  browser.storage.sync.get({
+    [CONSTANTS.TOKEN_NAME]: '',
+    [CONSTANTS.ARCHIVED_REPOS]: false
+  }, config => callback(config));
 }
 
 /**
@@ -462,18 +453,6 @@ function registerListeners() {
 }
 
 /**
- * Returns extension saved config
- *
- * @param {function} [callback] Callback function
- */
-function getConfig(callback = () => {}) {
-  browser.storage.sync.get({
-    [CONSTANTS.TOKEN_NAME]: '',
-    [CONSTANTS.ARCHIVED_REPOS]: false
-  }, config => callback(config));
-}
-
-/**
  * Called on plugin load
  */
 function init() {
@@ -494,6 +473,7 @@ function init() {
         syncLocalRepos(() => syncRepos());
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     }
   });
