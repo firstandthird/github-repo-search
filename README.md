@@ -18,7 +18,7 @@ Type `gh` + `[Tab]` and search through your GitHub repositories.
 
 ### MIT License
 
-Copyright (c) 2018 First+Third
+Copyright (c) 2020 First+Third
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
