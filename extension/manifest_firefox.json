@@ -18,7 +18,7 @@
   ],
   "applications": {
     "gecko": {
-      "id": "githubreposearch@firstandthird.com",
+      "id": "ghreposearch@firstandthird.com",
       "strict_min_version": "72.0"
     }
   },
