@@ -204,10 +204,9 @@ function createNotification({ id, content = {} }) {
 /**
  * Fetches GitHub user repos
  *
- * @async
  * @returns {Promise<Array>}
  */
-async function search() {
+function search() {
   if (isFetching) {
     return [];
   }
@@ -257,19 +256,18 @@ async function search() {
 /**
  * Fetches repos from GitHub and savem them into local storage
  *
- * @async
  * @param {boolean} [notify=false] If active, shows a success notification
  * @param {function} [callback]
  */
-async function syncRepos(notify = false, callback = () => { }) {
+function syncRepos(notify = false, callback = () => { }) {
   search()
-    .then(suggestionsCache => {
-      browser.storage.local.set({ repos: suggestionsCache }, () => {
+    .then(repos => {
+      browser.storage.local.set({ repos }, () => {
         if (notify) {
           createNotification(NOTIFICATIONS.syncSuccess);
         }
 
-        callback(suggestionsCache);
+        callback(repos);
       });
     })
     .catch(() => { });
@@ -298,10 +296,9 @@ function onBrowserStorageChanged(changes, areaName) {
 /**
  * Synchronizes local stored repositories
  *
- * @async
  * @param {function} [callback]
  */
-async function syncLocalRepos(callback = () => { }) {
+function syncLocalRepos(callback = () => { }) {
   browser.storage.local.get({
     repos: []
   }, data => {
@@ -330,8 +327,8 @@ function getSuggestionsCache(callback = () => { }) {
  * @param {function} suggest Opens the suggestions box
  */
 function onInputChangedHandler(text, suggest) {
-  getSuggestionsCache(suggestionsCache => {
-    const suggestions = highlightResults(text, suggestionsCache);
+  getSuggestionsCache(cache => {
+    const suggestions = highlightResults(text, cache);
 
     if (suggestions.length) {
       browser.omnibox.setDefaultSuggestion({ description: suggestions[0].description });
@@ -364,8 +361,8 @@ function onInputEnteredHandler(userInput, disposition) {
   try {
     url = new URL(userInput).href;
   } catch (error) {
-    getSuggestionsCache(suggestionsCache => {
-      const suggestions = highlightResults(userInput, suggestionsCache);
+    getSuggestionsCache(cache => {
+      const suggestions = highlightResults(userInput, cache);
 
       if (suggestions.length) {
         url = suggestions[0].content;
