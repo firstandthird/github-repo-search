@@ -4,21 +4,22 @@ Quickly access your Github repos from your browser omnibox. Learn more [here](ht
 
 ## Installation
 
-- Open Google Chrome and navigate to `chrome://extensions`.
-- Drop `extension.crx` into window. Click `Add extension` when prompted.
-- [Generate a Github Personal access token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/) and check `repos` scope.
+- Install for your browser
+    - [Chrome](https://chrome.google.com/webstore/detail/golckflcfoedoekcaflnnnilelogogpm)
+    - [Firefox](https://addons.mozilla.org/en-US/firefox/addon/github-repo-search/)
+- [Generate a Github Personal access token](https://github.com/settings/tokens/new?description=Github%20Repo%20Search&scopes=repo) and check `repos` scope.
 - Go to extension options available from extension toolbar icon context menu.
 - Paste your token and save changes.
 
 ## Usage
 
-Type `gh` + `[Tab]` and search through your GitHub repositories.
+Type `gh` + `[Space]` and search through your GitHub repositories.
 
 ## License
 
 ### MIT License
 
-Copyright (c) 2018 First+Third
+Copyright (c) 2020 First+Third
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

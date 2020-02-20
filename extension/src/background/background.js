@@ -1,4 +1,5 @@
 const browser = window.browser || window.chrome;
+const isDarkMode = matchMedia('(prefers-color-scheme: dark)').matches;
 
 /**
  * Default config
@@ -8,24 +9,8 @@ const CONSTANTS = {
   ARCHIVED_REPOS: 'archived'
 };
 
-const CONTEXT_MENU = {
-  id: 'ogh-sync-option',
-  syncDisabled: {
-    title: 'Synchronizing repositories...',
-    enabled: false,
-    onclick: null
-  },
-  syncRepos: {
-    title: 'Synchronize repositories',
-    enabled: true,
-    onclick: () => syncRepos(true)
-  },
-  addToken: {
-    title: 'Please provide a valid token',
-    enabled: true,
-    onclick: openOptionsPage
-  }
-};
+const isFirefox = typeof InstallTrigger !== 'undefined';
+const isChrome = !isFirefox;
 
 const NOTIFICATIONS = {
   installed: {
@@ -58,12 +43,15 @@ const NOTIFICATIONS = {
 
 const MAX_SUGGESTIONS = 10;
 
-const RESULTS_PER_PAGE = 100;
+const RESULTS_PER_PAGE = '100';
 
 const FETCH_PARAMS = {
   method: 'GET',
   mode: 'cors',
-  cache: 'default'
+  cache: 'default',
+  headers: {
+    Authorization: ''
+  }
 };
 
 const apiUrl = new URL('https://api.github.com/user/repos');
@@ -91,7 +79,7 @@ let suggestionsCache = [];
  * @returns
  */
 function setToken(token = '') {
-  apiUrl.searchParams.set('access_token', token);
+  FETCH_PARAMS.headers.Authorization = `token ${token}`;
 }
 
 /**
@@ -108,6 +96,29 @@ function formatAsSuggestion(data) {
 }
 
 /**
+ * Checks matches trying to use repo name.
+ * @param {string} description
+ * @param {RegExp} text
+ * @param {boolean} onlyRepo
+ * @returns {boolean}
+ */
+function isMatch(description, text, onlyRepo) {
+  const matchText = onlyRepo ? description.split('/').pop() : description;
+  return text.test(matchText);
+}
+
+/**
+ * Function that exposes current status
+ * @returns {{isFetching: boolean, token: string}}
+ */
+function getStatus() { // eslint-disable-line no-unused-vars
+  return {
+    isFetching,
+    token: FETCH_PARAMS.headers.Authorization
+  };
+}
+
+/**
  * Highlights matched text
  *
  * @param {string} text Text to match
@@ -117,42 +128,55 @@ function formatAsSuggestion(data) {
 function highlightResults(text, results) {
   try {
     const searchTextRegExp = new RegExp(text, 'i');
+    const highlights = [];
+    const added = {};
+    const length = results.length;
 
-    return results
-      .filter(suggestion => searchTextRegExp.test(suggestion.description))
-      .slice(0, MAX_SUGGESTIONS)
+    // Only searching on repo name first
+    for (let i = 0; i < length; i++) {
+      const repo = results[i];
+
+      if (isMatch(repo.description, searchTextRegExp, true)) {
+        highlights.push(repo);
+        added[repo.description] = true;
+
+        if (highlights.length === MAX_SUGGESTIONS) {
+          break;
+        }
+      }
+    }
+
+    // If not enough suggestions, try the org/user too
+    for (let i = 0; i < length; i++) {
+      const repo = results[i];
+
+      if (!added[repo.description] && isMatch(repo.description, searchTextRegExp, false)) {
+        highlights.push(repo);
+
+        if (highlights.length === MAX_SUGGESTIONS) {
+          break;
+        }
+      }
+    }
+
+    return highlights
       .map(res => {
-        const match = res.description.replace(searchTextRegExp, '<match>$&</match>');
+        let match = res.description;
+        let description = match;
+
+        if (isChrome) {
+          match = match.replace(searchTextRegExp, '<match>$&</match>');
+          description = `<dim>${match}</dim> <url>${res.content}</url>`;
+        }
 
         return {
           content: res.content,
-          description: `<dim>${match}</dim> <url>${res.content}</url>`
+          description
         };
       });
   } catch (error) {
     return [];
   }
-}
-
-/**
- * Enables manual sync button
- */
-function enableSyncButton() {
-  browser.contextMenus.update(CONTEXT_MENU.id, CONTEXT_MENU.syncRepos);
-}
-
-/**
- * Disables manual sync button
- */
-function disableSyncButton() {
-  browser.contextMenus.update(CONTEXT_MENU.id, CONTEXT_MENU.syncDisabled);
-}
-
-/**
- * Disables manual sync button
- */
-function setInvalidTokenButton() {
-  browser.contextMenus.update(CONTEXT_MENU.id, CONTEXT_MENU.addToken);
 }
 
 /**
@@ -163,8 +187,9 @@ function setInvalidTokenButton() {
  * @param {Object} [notification.content={}] - Notification options (title, message...)
  */
 function createNotification({ id, content = {} }) {
+  const icon = isDarkMode ? 'icon48_light.png' : 'icon48.png';
   const notification = Object.assign({
-    iconUrl: '../../icons/icon48.png',
+    iconUrl: `../../icons/${icon}`,
     title: 'Github Repo Search',
     type: 'basic'
   }, content);
@@ -179,17 +204,16 @@ function createNotification({ id, content = {} }) {
 /**
  * Fetches GitHub user repos
  *
- * @async
  * @returns {Promise<Array>}
  */
-async function search() {
+function search() {
   if (isFetching) {
     return [];
   }
 
   isFetching = true;
 
-  const getRepos = async (page = 1, items = []) => {
+  const getRepos = async (page = '1', items = []) => {
     try {
       apiUrl.searchParams.set('page', page);
 
@@ -198,14 +222,12 @@ async function search() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          setInvalidTokenButton();
           createNotification(NOTIFICATIONS.tokenError);
         } else {
-          enableSyncButton();
           createNotification(NOTIFICATIONS.syncError);
         }
 
-        throw ('Error fetching repos');
+        throw new Error('Error fetching repos');
       }
 
       const totalResults = data.length;
@@ -222,8 +244,7 @@ async function search() {
       }
 
       return await getRepos(page + 1, items);
-    }
-    catch (error) {
+    } catch (error) {
       isFetching = false;
       throw error;
     }
@@ -233,16 +254,23 @@ async function search() {
 }
 
 /**
- * Adds context menu buttons
+ * Fetches repos from GitHub and savem them into local storage
+ *
+ * @param {boolean} [notify=false] If active, shows a success notification
+ * @param {function} [callback]
  */
-function addContextButtons() {
-  browser.contextMenus.create({
-    id: CONTEXT_MENU.id,
-    contexts: ['page_action'],
-    type: 'normal',
-    title: 'Synchronize repositories',
-    visible: true
-  }, () => { });
+function syncRepos(notify = false, callback = () => { }) {
+  search()
+    .then(repos => {
+      browser.storage.local.set({ repos }, () => {
+        if (notify) {
+          createNotification(NOTIFICATIONS.syncSuccess);
+        }
+
+        callback(repos);
+      });
+    })
+    .catch(() => { });
 }
 
 /**
@@ -255,7 +283,6 @@ function onBrowserStorageChanged(changes, areaName) {
   if (areaName === 'sync') {
     if (changes[CONSTANTS.TOKEN_NAME]) {
       setToken(changes[CONSTANTS.TOKEN_NAME].newValue || changes[CONSTANTS.TOKEN_NAME]);
-      enableSyncButton();
     }
 
     if (changes[CONSTANTS.ARCHIVED_REPOS]) {
@@ -267,23 +294,16 @@ function onBrowserStorageChanged(changes, areaName) {
 }
 
 /**
- * Fired on every input change
+ * Synchronizes local stored repositories
  *
- * @param {string} text User entered text
- * @param {function} suggest Opens the suggestions box
+ * @param {function} [callback]
  */
-function onInputChangedHandler(text, suggest) {
-  getSuggestionsCache(suggestionsCache => {
-    const suggestions = highlightResults(text, suggestionsCache);
-
-    if (suggestions.length) {
-      browser.omnibox.setDefaultSuggestion({ description: suggestions[0].description });
-      suggestions.shift();
-    } else {
-      browser.omnibox.setDefaultSuggestion({ description: `No repositories found matching <match>${ text }</match>` });
-    }
-
-    suggest(suggestions);
+function syncLocalRepos(callback = () => { }) {
+  browser.storage.local.get({
+    repos: []
+  }, data => {
+    suggestionsCache = data.repos;
+    callback(data.repos);
   });
 }
 
@@ -292,7 +312,7 @@ function onInputChangedHandler(text, suggest) {
  *
  * @param {function} [callback] Callback function with cached repos array
  */
-function getSuggestionsCache(callback = () => {}) {
+function getSuggestionsCache(callback = () => { }) {
   if (suggestionsCache && suggestionsCache.length) {
     return callback(suggestionsCache);
   }
@@ -301,19 +321,48 @@ function getSuggestionsCache(callback = () => {}) {
 }
 
 /**
+ * Fired on every input change
+ *
+ * @param {string} text User entered text
+ * @param {function} suggest Opens the suggestions box
+ */
+function onInputChangedHandler(text, suggest) {
+  getSuggestionsCache(cache => {
+    const suggestions = highlightResults(text, cache);
+
+    if (suggestions.length) {
+      browser.omnibox.setDefaultSuggestion({ description: suggestions[0].description });
+
+      if (isChrome) {
+        suggestions.shift();
+      }
+    } else {
+      const description = isFirefox ?
+        `No repositories found matching "${text}"` :
+        `No repositories found matching <match>${text}</match>`;
+
+      browser.omnibox.setDefaultSuggestion({ description });
+    }
+
+    suggest(suggestions);
+  });
+}
+
+/**
  * Navigates to the given URL or filters cached results if not url provided
  *
  * @param {string} userInput Text entered by the user
+ * @param {string} disposition Describes how the extension should handle a user selection
+ * from the suggestions in the address bar's drop-down list.
  */
-function onInputEnteredHandler(userInput) {
+function onInputEnteredHandler(userInput, disposition) {
   let url;
 
   try {
     url = new URL(userInput).href;
-  }
-  catch (error) {
-    getSuggestionsCache(suggestionsCache => {
-      const suggestions = highlightResults(userInput, suggestionsCache);
+  } catch (error) {
+    getSuggestionsCache(cache => {
+      const suggestions = highlightResults(userInput, cache);
 
       if (suggestions.length) {
         url = suggestions[0].content;
@@ -322,49 +371,30 @@ function onInputEnteredHandler(userInput) {
   }
 
   if (url) {
-    browser.tabs.query({ active: true, currentWindow: true }, tabs => {
-      browser.tabs.update(tabs[0].id, { url });
-    });
+    switch (disposition) {
+      case 'newForegroundTab':
+        browser.tabs.create({ url });
+        break;
+      case 'newBackgroundTab':
+        browser.tabs.create({ url, active: false });
+        break;
+      case 'currentTab':
+      default:
+        browser.tabs.update({ url });
+    }
   }
 }
 
 /**
- * Synchronizes local stored repositories
+ * Returns extension saved config
  *
- * @async
- * @param {function} [callback]
+ * @param {function} [callback] Callback function
  */
-async function syncLocalRepos(callback = () => {}) {
-  browser.storage.local.get({
-    'repos': []
-  }, data => {
-    suggestionsCache = data.repos;
-    callback(data.repos);
-  });
-}
-
-/**
- * Fetches repos from GitHub and savem them into local storage
- *
- * @async
- * @param {boolean} [notify=false] If active, shows a success notification
- * @param {function} [callback]
- */
-async function syncRepos(notify = false, callback = () => {}) {
-  disableSyncButton();
-
-  search()
-    .then(suggestionsCache => {
-      browser.storage.local.set({ repos: suggestionsCache }, () => {
-        if (notify) {
-          createNotification(NOTIFICATIONS.syncSuccess);
-        }
-
-        enableSyncButton();
-        callback(suggestionsCache);
-      });
-    })
-    .catch(error => {});
+function getConfig(callback = () => { }) {
+  browser.storage.sync.get({
+    [CONSTANTS.TOKEN_NAME]: '',
+    [CONSTANTS.ARCHIVED_REPOS]: false
+  }, config => callback(config));
 }
 
 /**
@@ -373,7 +403,6 @@ async function syncRepos(notify = false, callback = () => {}) {
 function onExtensionInstall() {
   getConfig(config => {
     if (!config[CONSTANTS.TOKEN_NAME]) {
-      setInvalidTokenButton();
       createNotification(NOTIFICATIONS.installed);
     }
   });
@@ -399,38 +428,38 @@ function onNotificationClicked(notificationId) {
   if (notificationId === NOTIFICATIONS.installed.id || notificationId === NOTIFICATIONS.tokenError.id) {
     openOptionsPage();
   }
-};
+}
 
 /**
  * Register event listeners
  */
 function registerListeners() {
   browser.storage.onChanged.addListener(onBrowserStorageChanged);
+
   browser.omnibox.onInputChanged.addListener(onInputChangedHandler);
   browser.omnibox.onInputEntered.addListener(onInputEnteredHandler);
+
   browser.omnibox.onInputStarted.addListener(syncLocalRepos);
   browser.runtime.onInstalled.addListener(onExtensionInstall);
   browser.notifications.onClicked.addListener(onNotificationClicked);
-}
 
-/**
- * Returns extension saved config
- *
- * @param {function} [callback] Callback function
- */
-function getConfig(callback = () => {}) {
-  browser.storage.sync.get({
-    [CONSTANTS.TOKEN_NAME]: '',
-    [CONSTANTS.ARCHIVED_REPOS]: false
-  }, config => callback(config));
+  browser.omnibox.setDefaultSuggestion({
+    description: `Search for a Github Repo
+    (e.g. "jquery")`
+  });
 }
 
 /**
  * Called on plugin load
  */
 function init() {
-  addContextButtons();
   registerListeners();
+
+  if (isDarkMode) {
+    browser.browserAction.setIcon({
+      path: 'icons/icon48_light.png'
+    });
+  }
 
   getConfig(config => {
     try {
@@ -438,11 +467,10 @@ function init() {
 
       if (config[CONSTANTS.TOKEN_NAME]) {
         setToken(config[CONSTANTS.TOKEN_NAME]);
-        syncLocalRepos(data => syncRepos());
-      } else {
-        disableSyncButton();
+        syncLocalRepos(() => syncRepos());
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.log(error);
     }
   });

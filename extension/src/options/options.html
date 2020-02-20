@@ -6,9 +6,29 @@
     #status {
       color: darkgreen;
     }
+
     input[type="text"] {
       padding: 5px 0;
       width: 100%;
+    }
+
+    a {
+      color: #45a1ff;
+    }
+
+    body {
+      padding: 10px;
+    }
+
+    label + input {
+      margin-top: 10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #202023;
+        color: #fff;
+      }
     }
   </style>
 </head>
@@ -17,11 +37,11 @@
   <form id="options-form" name="options">
     <p>
       <label for="token">GitHub Personal token:</label>
-      <input type="text" name="token" id="token" value="" placeholder="Your token here" size="40" minlength="40" maxlength="40" required>
+      <input autofocus type="text" name="token" id="token" value="" placeholder="Your token here" size="40" minlength="40" maxlength="40" required>
     </p>
 
     <p>
-      Create a token <a href="https://github.com/settings/tokens" target="_blank" title="Generate a GitHub Personal token">here</a>. Give it <strong>repo</strong> permissions (select repo scope).
+      Create a token <a href="https://github.com/settings/tokens/new?description=Github%20Repo%20Search&scopes=repo" target="_blank" title="Generate a GitHub Personal token">here</a>. Give it <strong>repo</strong> permissions (select repo scope).
     </p>
 
     <p>
@@ -35,17 +55,16 @@
     </p>
 
     <small>
-      <strong>Privacy:</strong> The extension only reads repository names and never writes to your repos. You can <a href="https://github.com/firstandthird/github-repo-search" target="_blank" title="See Github Repos Code">see the code here</a> (only endpoint hit is GET /user/repos).
+      <strong>Privacy:</strong> This extension only reads repository names and never writes to your repos. You can <a href="https://github.com/firstandthird/github-repo-search" target="_blank" title="See Github Repos Code">see the code here</a> (only endpoint being hit is GET /user/repos).
     </small>
   </form>
 
   <hr>
 
   <p>
-    <small>&copy; 2018 - <a href="https://firstandthird.com/" target="_blank" title="Company website">First+Third</small>
+    <small>&copy; 2018 - <a href="https://firstandthird.com/" target="_blank" title="Company website">First+Third</a></small>
   </p>
 
   <script src="options.js"></script>
-
 </body>
 </html>

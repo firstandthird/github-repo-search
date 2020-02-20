@@ -20,8 +20,17 @@
   },
   "homepage": "https://firstandthird.com/opensource/github-repo-search",
   "devDependencies": {
-    "eslint-config-firstandthird": "4.3.0",
-    "eslint-plugin-import": "2.8.0"
+    "eslint": "^6.8.0",
+    "eslint-config-firstandthird": "^5.0.0",
+    "eslint-plugin-import": "^2.20.1",
+    "ncp": "^2.0.0",
+    "rimraf": "^3.0.2",
+    "rmfr": "^2.0.0"
+  },
+  "scripts": {
+    "release": "node tasks/release",
+    "lint": "eslint extension/src",
+    "prerelease": "npm run lint"
   },
   "eslintConfig": {
     "extends": "firstandthird",
