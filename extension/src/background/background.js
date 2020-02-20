@@ -213,9 +213,9 @@ function search() {
 
   isFetching = true;
 
-  const getRepos = async (page = '1', items = []) => {
+  const getRepos = async (page = 1, items = []) => {
     try {
-      apiUrl.searchParams.set('page', page);
+      apiUrl.searchParams.set('page', page.toString());
 
       const response = await fetch(apiUrl, FETCH_PARAMS);
       let data = await response.json();
