@@ -29,7 +29,8 @@
   },
   "scripts": {
     "release": "node tasks/release",
-    "lint": "eslint extension/src"
+    "lint": "eslint extension/src",
+    "prerelease": "npm run lint"
   },
   "eslintConfig": {
     "extends": "firstandthird",
