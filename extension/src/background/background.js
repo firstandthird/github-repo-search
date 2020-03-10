@@ -6,7 +6,8 @@ const isDarkMode = matchMedia('(prefers-color-scheme: dark)').matches;
  */
 const CONSTANTS = {
   TOKEN_NAME: 'ogh_personal_token',
-  ARCHIVED_REPOS: 'archived'
+  ARCHIVED_REPOS: 'archived',
+  AUTOSYNC_REPOS: 'autosync'
 };
 
 const isFirefox = typeof InstallTrigger !== 'undefined';
@@ -61,6 +62,11 @@ apiUrl.searchParams.set('per_page', RESULTS_PER_PAGE);
  * Default options
  */
 let showArchivedRepos = false;
+
+/**
+ * Sync repos automatically (default every 30 minutes)
+ */
+let autoSyncRepos = 30;
 
 /**
  * Indicates whether a request is still on course or not
@@ -208,7 +214,7 @@ function createNotification({ id, content = {} }) {
  */
 function search() {
   if (isFetching) {
-    return [];
+    return Promise.resolve([]);
   }
 
   isFetching = true;
@@ -274,6 +280,27 @@ function syncRepos(notify = false, callback = () => { }) {
 }
 
 /**
+ * Cancels a scheduled alarm
+ *
+ * @param {string} [name=null] Alarm name
+ */
+function cancelAlarm(name = null) {
+  browser.alarms.clear(name);
+}
+
+/**
+ * Schedule a periodic alarm
+ *
+ * @param {string} [name=null] Alarm name
+ * @param {number} [time=30] Alarm period
+ */
+function createAlarm(name = null, time = 30) {
+  browser.alarms.create(name, {
+    periodInMinutes: parseInt(time, 10)
+  });
+}
+
+/**
  * Handles browser storage changes
  *
  * @param {Object} changes
@@ -287,6 +314,20 @@ function onBrowserStorageChanged(changes, areaName) {
 
     if (changes[CONSTANTS.ARCHIVED_REPOS]) {
       showArchivedRepos = changes[CONSTANTS.ARCHIVED_REPOS].newValue;
+    }
+
+    const autoSyncChange = changes[CONSTANTS.AUTOSYNC_REPOS];
+
+    if (autoSyncChange) {
+      autoSyncRepos = autoSyncChange.newValue;
+
+      if (autoSyncRepos) {
+        createAlarm(CONSTANTS.AUTOSYNC_REPOS, autoSyncRepos);
+      } else {
+        cancelAlarm(CONSTANTS.AUTOSYNC_REPOS);
+      }
+
+      return;
     }
 
     syncRepos(true);
@@ -393,6 +434,7 @@ function onInputEnteredHandler(userInput, disposition) {
 function getConfig(callback = () => { }) {
   browser.storage.sync.get({
     [CONSTANTS.TOKEN_NAME]: '',
+    [CONSTANTS.AUTOSYNC_REPOS]: 30,
     [CONSTANTS.ARCHIVED_REPOS]: false
   }, config => callback(config));
 }
@@ -431,6 +473,18 @@ function onNotificationClicked(notificationId) {
 }
 
 /**
+ * Browser alarms handler
+ *
+ * @param {Object} alarm Alarm data
+ * @param {string} alarm.name Alarm name
+ */
+function onAlarmHandler({ name }) {
+  if (name === CONSTANTS.AUTOSYNC_REPOS) {
+    syncRepos();
+  }
+}
+
+/**
  * Register event listeners
  */
 function registerListeners() {
@@ -442,6 +496,8 @@ function registerListeners() {
   browser.omnibox.onInputStarted.addListener(syncLocalRepos);
   browser.runtime.onInstalled.addListener(onExtensionInstall);
   browser.notifications.onClicked.addListener(onNotificationClicked);
+
+  browser.alarms.onAlarm.addListener(onAlarmHandler);
 
   browser.omnibox.setDefaultSuggestion({
     description: `Search for a Github Repo
@@ -464,10 +520,18 @@ function init() {
   getConfig(config => {
     try {
       showArchivedRepos = config[CONSTANTS.ARCHIVED_REPOS];
+      autoSyncRepos = config[CONSTANTS.AUTOSYNC_REPOS];
 
       if (config[CONSTANTS.TOKEN_NAME]) {
         setToken(config[CONSTANTS.TOKEN_NAME]);
-        syncLocalRepos(() => syncRepos());
+
+        syncLocalRepos(() => syncRepos(false, () => {
+          if (autoSyncRepos) {
+            createAlarm(CONSTANTS.AUTOSYNC_REPOS, autoSyncRepos);
+          } else {
+            cancelAlarm(CONSTANTS.AUTOSYNC_REPOS);
+          }
+        }));
       }
     } catch (error) {
       // eslint-disable-next-line no-console
