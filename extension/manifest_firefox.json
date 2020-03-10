@@ -12,6 +12,7 @@
   "homepage_url": "https://firstandthird.com/opensource/github-repo-search",
   "author": "First+Third <code@firstandthird.com> (http://firstandthird.com/)",
   "permissions": [
+    "alarms",
     "storage",
     "notifications",
     "https://api.github.com/user/repos"
