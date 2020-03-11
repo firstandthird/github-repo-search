@@ -1,6 +1,8 @@
-# Github Repo Search
+# Github Repo Search ![GitHub package.json version](https://img.shields.io/github/package-json/v/firstandthird/github-repo-search)
 
 Quickly access your Github repos from your browser omnibox. Learn more [here](https://firstandthird.com/opensource/github-repo-search).
+
+![Chrome](https://developer.chrome.com/webstore/images/ChromeWebStore_BadgeWBorder_v2_206x58.png) ![Firefox](https://ffp4g1ylyit3jdyti1hqcvtb-wpengine.netdna-ssl.com/addons/files/2015/11/get-the-addon.png)
 
 ## Installation
 
